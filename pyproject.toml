@@ -7,7 +7,7 @@ name = "codeforge-agent"
 version = "0.1.0"
 description = "A lightweight AI software engineering agent for repository understanding and verified code changes."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14,<3.15"
 dependencies = [
     "fastapi>=0.116,<1",
     "uvicorn[standard]>=0.35,<1",
@@ -31,12 +31,12 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.14"
 strict = true
 files = ["src", "tests"]

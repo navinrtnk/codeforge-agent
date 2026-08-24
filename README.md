@@ -4,7 +4,7 @@ A lightweight AI software engineering agent built with Python and FastAPI.
 
 ## Requirements
 
-- Python 3.11 or newer
+- Python 3.14.7
 - [uv](https://docs.astral.sh/uv/)
 - Make (optional)
 
