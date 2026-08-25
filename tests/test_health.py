@@ -2,13 +2,15 @@
 
 from fastapi.testclient import TestClient
 
+from agent.config import Settings
 from agent.main import create_app
 
 
 def test_health_returns_ok() -> None:
-    client = TestClient(create_app())
+    settings = Settings(database_url="sqlite://", _env_file=None)  # type: ignore[call-arg]
 
-    response = client.get("/health")
+    with TestClient(create_app(settings)) as client:
+        response = client.get("/health")
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}

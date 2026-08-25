@@ -16,6 +16,9 @@ Install the project and its development dependencies:
 uv sync
 ```
 
+Copy `.env.example` to `.env` to customize the database, workspace, or model
+configuration. Environment variables use the `CODEFORGE_` prefix.
+
 Start the development server:
 
 ```bash
@@ -26,6 +29,20 @@ Then visit `http://127.0.0.1:8000/health`. The endpoint returns:
 
 ```json
 {"status": "ok"}
+```
+
+Register an existing repository directory:
+
+```bash
+curl -X POST http://127.0.0.1:8000/repositories \
+  -H "Content-Type: application/json" \
+  -d '{"name":"CodeForge Agent","path":"/absolute/path/to/codeforge-agent"}'
+```
+
+List registered repositories:
+
+```bash
+curl http://127.0.0.1:8000/repositories
 ```
 
 ## Development
