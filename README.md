@@ -45,6 +45,17 @@ List registered repositories:
 curl http://127.0.0.1:8000/repositories
 ```
 
+## Repository access
+
+Registered repositories must resolve inside `CODEFORGE_WORKSPACE_ROOT`. Repository
+file access rejects absolute paths, path traversal, and symlinks that escape the
+repository. Generated directories such as `.git`, `.venv`, `node_modules`, and
+build caches are excluded from file discovery by default.
+
+Configure exclusions with `CODEFORGE_REPOSITORY_IGNORE_PATTERNS` as a JSON array.
+Text reads are limited to `CODEFORGE_MAX_FILE_SIZE_BYTES` bytes and reject binary
+or non-UTF-8 content. These controls form the boundary used by future agent tools.
+
 ## Development
 
 Run all quality checks:

@@ -74,6 +74,22 @@ def test_register_repository_rejects_file_path(tmp_path: Path) -> None:
     assert response.json() == {"detail": "Repository path is not a directory"}
 
 
+def test_register_repository_rejects_path_outside_workspace(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    outside = tmp_path / "outside"
+    workspace.mkdir()
+    outside.mkdir()
+
+    with create_test_client(workspace / "test.db") as client:
+        response = client.post(
+            "/repositories",
+            json={"name": "Outside", "path": str(outside)},
+        )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Repository path is outside the workspace root"}
+
+
 def test_list_repositories_supports_pagination(tmp_path: Path) -> None:
     first_path = tmp_path / "first"
     second_path = tmp_path / "second"

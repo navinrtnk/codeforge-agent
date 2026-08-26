@@ -27,6 +27,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
+    application.state.settings = application_settings
 
     @application.get("/health", tags=["system"])
     async def health() -> dict[str, str]:
