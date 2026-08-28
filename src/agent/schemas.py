@@ -24,3 +24,22 @@ class RepositoryResponse(BaseModel):
     path: str
     created_at: datetime
     updated_at: datetime
+
+
+class IndexingResponse(BaseModel):
+    """Counts produced by a repository indexing run."""
+
+    discovered: int
+    indexed: int
+    updated: int
+    skipped: int
+    deleted: int
+    failed: int
+
+
+class IndexStatusResponse(BaseModel):
+    """Current persisted index statistics."""
+
+    file_count: int
+    chunk_count: int
+    last_indexed_at: datetime | None

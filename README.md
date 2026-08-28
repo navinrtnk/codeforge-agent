@@ -1,5 +1,7 @@
 # CodeForge Agent
 
+[![tests](https://github.com/navinrtnk/codeforge-agent/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/navinrtnk/codeforge-agent/actions/workflows/tests.yml)
+
 A lightweight AI software engineering agent built with Python and FastAPI.
 
 ## Requirements
@@ -55,6 +57,26 @@ build caches are excluded from file discovery by default.
 Configure exclusions with `CODEFORGE_REPOSITORY_IGNORE_PATTERNS` as a JSON array.
 Text reads are limited to `CODEFORGE_MAX_FILE_SIZE_BYTES` bytes and reject binary
 or non-UTF-8 content. These controls form the boundary used by future agent tools.
+
+## Repository indexing
+
+Start or refresh a repository index using its registration ID:
+
+```bash
+curl -X POST http://127.0.0.1:8000/repositories/REPOSITORY_ID/index
+```
+
+Inspect the current persisted index:
+
+```bash
+curl http://127.0.0.1:8000/repositories/REPOSITORY_ID/index/status
+```
+
+The index stores each text file's language, SHA-256 content hash, and deterministic
+line-based chunks. Reindexing skips unchanged files, replaces chunks for changed
+files, removes deleted files, and reports unreadable or binary files without
+aborting the run. Set `CODEFORGE_INDEX_CHUNK_SIZE_LINES` to change the default
+200-line chunk size.
 
 ## Development
 

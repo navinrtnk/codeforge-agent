@@ -33,6 +33,7 @@ class Settings(BaseSettings):
         "*.pyc",
     )
     max_file_size_bytes: int = Field(default=1_000_000, gt=0)
+    index_chunk_size_lines: int = Field(default=200, gt=0)
     model_provider: Literal["openai", "anthropic"] = "openai"
     model_name: str | None = None
     openai_api_key: SecretStr | None = None

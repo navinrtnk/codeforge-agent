@@ -16,6 +16,7 @@ def test_settings_have_development_defaults() -> None:
     assert settings.workspace_root == Path(".")
     assert ".git" in settings.repository_ignore_patterns
     assert settings.max_file_size_bytes == 1_000_000
+    assert settings.index_chunk_size_lines == 200
     assert settings.model_provider == "openai"
 
 
@@ -25,6 +26,7 @@ def test_settings_load_environment_overrides(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setenv("CODEFORGE_OPENAI_API_KEY", "secret-value")
     monkeypatch.setenv("CODEFORGE_REPOSITORY_IGNORE_PATTERNS", '["vendor", "*.log"]')
     monkeypatch.setenv("CODEFORGE_MAX_FILE_SIZE_BYTES", "2048")
+    monkeypatch.setenv("CODEFORGE_INDEX_CHUNK_SIZE_LINES", "50")
 
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
 
@@ -32,6 +34,7 @@ def test_settings_load_environment_overrides(monkeypatch: pytest.MonkeyPatch) ->
     assert settings.model_provider == "anthropic"
     assert settings.repository_ignore_patterns == ("vendor", "*.log")
     assert settings.max_file_size_bytes == 2048
+    assert settings.index_chunk_size_lines == 50
     assert settings.openai_api_key is not None
     assert settings.openai_api_key.get_secret_value() == "secret-value"
     assert "secret-value" not in repr(settings)
