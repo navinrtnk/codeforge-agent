@@ -9,8 +9,10 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from agent.models import CodeChunk, IndexedFile, Repository, utc_now
+from agent.models import CodeChunk, CodeSymbol, IndexedFile, Repository, utc_now
 from agent.repository_access import RepositoryAccess, RepositoryAccessError
+from agent.search import sync_repository_fts
+from agent.symbols import ExtractedSymbol, extract_python_symbols
 
 LANGUAGES_BY_EXTENSION = {
     ".c": "c",
@@ -127,7 +129,7 @@ class RepositoryIndexer:
         statement = (
             select(IndexedFile)
             .where(IndexedFile.repository_id == repository.id)
-            .options(selectinload(IndexedFile.chunks))
+            .options(selectinload(IndexedFile.chunks), selectinload(IndexedFile.symbols))
         )
         existing_files = {file.path: file for file in session.scalars(statement)}
         discovered_paths = {file.path for file in discovered_files}
@@ -141,11 +143,14 @@ class RepositoryIndexer:
                 continue
 
             content_hash = hash_content(content)
+            language = detect_language(file.path)
+            symbols = extract_python_symbols(content) if language == "python" else []
             existing_file = existing_files.get(file.path)
             if (
                 existing_file is not None
                 and existing_file.content_hash == content_hash
                 and existing_file.chunk_size_lines == self.chunk_size_lines
+                and _symbols_match(existing_file.symbols, symbols)
             ):
                 skipped += 1
                 continue
@@ -156,7 +161,7 @@ class RepositoryIndexer:
                     repository=repository,
                     path=file.path,
                     content_hash=content_hash,
-                    language=detect_language(file.path),
+                    language=language,
                     size_bytes=file.size_bytes,
                     chunk_size_lines=self.chunk_size_lines,
                 )
@@ -164,11 +169,12 @@ class RepositoryIndexer:
                 indexed += 1
             else:
                 existing_file.content_hash = content_hash
-                existing_file.language = detect_language(file.path)
+                existing_file.language = language
                 existing_file.size_bytes = file.size_bytes
                 existing_file.chunk_size_lines = self.chunk_size_lines
                 existing_file.indexed_at = utc_now()
                 existing_file.chunks.clear()
+                existing_file.symbols.clear()
                 session.flush()
                 updated += 1
 
@@ -181,10 +187,23 @@ class RepositoryIndexer:
                 )
                 for chunk in chunks
             )
+            existing_file.symbols.extend(
+                CodeSymbol(
+                    name=symbol.name,
+                    qualified_name=symbol.qualified_name,
+                    kind=symbol.kind,
+                    signature=symbol.signature,
+                    start_line=symbol.start_line,
+                    end_line=symbol.end_line,
+                )
+                for symbol in symbols
+            )
 
         deleted_paths = set(existing_files) - discovered_paths
         for deleted_path in deleted_paths:
             session.delete(existing_files[deleted_path])
+        session.flush()
+        sync_repository_fts(session, repository.id)
         session.commit()
 
         return IndexingResult(
@@ -195,6 +214,35 @@ class RepositoryIndexer:
             deleted=len(deleted_paths),
             failed=failed,
         )
+
+
+def _symbols_match(
+    stored_symbols: list[CodeSymbol],
+    extracted_symbols: list[ExtractedSymbol],
+) -> bool:
+    stored = [
+        (
+            symbol.name,
+            symbol.qualified_name,
+            symbol.kind,
+            symbol.signature,
+            symbol.start_line,
+            symbol.end_line,
+        )
+        for symbol in stored_symbols
+    ]
+    extracted = [
+        (
+            symbol.name,
+            symbol.qualified_name,
+            symbol.kind,
+            symbol.signature,
+            symbol.start_line,
+            symbol.end_line,
+        )
+        for symbol in extracted_symbols
+    ]
+    return stored == extracted
 
 
 def get_index_status(session: Session, repository_id: uuid.UUID) -> IndexStatus:

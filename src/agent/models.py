@@ -88,6 +88,11 @@ class IndexedFile(Base):
         cascade="all, delete-orphan",
         order_by="CodeChunk.chunk_index",
     )
+    symbols: Mapped[list[CodeSymbol]] = relationship(
+        back_populates="indexed_file",
+        cascade="all, delete-orphan",
+        order_by="CodeSymbol.start_line",
+    )
 
 
 class CodeChunk(Base):
@@ -107,6 +112,26 @@ class CodeChunk(Base):
     content: Mapped[str] = mapped_column(Text)
 
     indexed_file: Mapped[IndexedFile] = relationship(back_populates="chunks")
+
+
+class CodeSymbol(Base):
+    """A named Python declaration extracted from an indexed file."""
+
+    __tablename__ = "code_symbols"
+
+    id: Mapped[uuid.UUID] = mapped_column(SqlUuid, primary_key=True, default=uuid.uuid4)
+    indexed_file_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("indexed_files.id", ondelete="CASCADE"),
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    qualified_name: Mapped[str] = mapped_column(Text, index=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    signature: Mapped[str] = mapped_column(Text)
+    start_line: Mapped[int] = mapped_column(Integer)
+    end_line: Mapped[int] = mapped_column(Integer)
+
+    indexed_file: Mapped[IndexedFile] = relationship(back_populates="symbols")
 
 
 class AgentRun(Base):

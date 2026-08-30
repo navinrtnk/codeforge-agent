@@ -43,3 +43,27 @@ class IndexStatusResponse(BaseModel):
     file_count: int
     chunk_count: int
     last_indexed_at: datetime | None
+
+
+class SearchResultResponse(BaseModel):
+    """One matching source chunk."""
+
+    path: str
+    language: str
+    start_line: int
+    end_line: int
+    snippet: str
+    score: float
+
+
+class SymbolSearchResultResponse(BaseModel):
+    """One matching extracted symbol."""
+
+    path: str
+    language: str
+    name: str
+    qualified_name: str
+    kind: str
+    signature: str
+    start_line: int
+    end_line: int

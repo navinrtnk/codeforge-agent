@@ -78,6 +78,31 @@ files, removes deleted files, and reports unreadable or binary files without
 aborting the run. Set `CODEFORGE_INDEX_CHUNK_SIZE_LINES` to change the default
 200-line chunk size.
 
+## Code search
+
+Search indexed code using ranked SQLite FTS5 retrieval:
+
+```bash
+curl "http://127.0.0.1:8000/repositories/REPOSITORY_ID/search?q=repository+index"
+```
+
+Use literal substring matching when exact spelling matters:
+
+```bash
+curl "http://127.0.0.1:8000/repositories/REPOSITORY_ID/search?q=RepositoryIndexer&mode=exact&case_sensitive=true"
+```
+
+Search Python classes, functions, async functions, and methods by name or
+qualified name:
+
+```bash
+curl "http://127.0.0.1:8000/repositories/REPOSITORY_ID/symbols?q=RepositoryIndexer.index"
+```
+
+Search results are restricted to the requested repository and include file path,
+language, line range, and a matching snippet. Python symbols are extracted with
+the standard-library AST and refreshed during incremental indexing.
+
 ## Development
 
 Run all quality checks:

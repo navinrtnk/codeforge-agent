@@ -3,7 +3,7 @@
 from collections.abc import Generator
 
 from fastapi import Request
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -30,6 +30,24 @@ class Database:
     def create_schema(self) -> None:
         """Create tables that do not already exist."""
         Base.metadata.create_all(self.engine)
+        if self.engine.dialect.name == "sqlite":
+            with self.engine.begin() as connection:
+                connection.execute(
+                    text(
+                        """
+                        CREATE VIRTUAL TABLE IF NOT EXISTS code_chunks_fts USING fts5(
+                            chunk_id UNINDEXED,
+                            repository_id UNINDEXED,
+                            path UNINDEXED,
+                            language UNINDEXED,
+                            start_line UNINDEXED,
+                            end_line UNINDEXED,
+                            content,
+                            tokenize = 'unicode61'
+                        )
+                        """
+                    )
+                )
 
     def session(self) -> Generator[Session]:
         """Yield a database session and always close it afterward."""

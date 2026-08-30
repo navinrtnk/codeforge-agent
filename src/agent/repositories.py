@@ -1,7 +1,7 @@
 """Repository registration API."""
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
@@ -22,6 +22,16 @@ from agent.schemas import (
     IndexStatusResponse,
     RepositoryCreate,
     RepositoryResponse,
+    SearchResultResponse,
+    SymbolSearchResultResponse,
+)
+from agent.search import (
+    InvalidSearchQueryError,
+    SearchResult,
+    SymbolSearchResult,
+    exact_search,
+    lexical_search,
+    symbol_search,
 )
 
 router = APIRouter(prefix="/repositories", tags=["repositories"])
@@ -116,6 +126,52 @@ def repository_index_status(
     """Return current index file and chunk counts."""
     _get_repository(session, repository_id)
     return get_index_status(session, repository_id)
+
+
+@router.get("/{repository_id}/search", response_model=list[SearchResultResponse])
+def search_repository(
+    repository_id: uuid.UUID,
+    session: SessionDependency,
+    q: Annotated[str, Query(min_length=1, max_length=500)],
+    mode: Annotated[Literal["lexical", "exact"], Query()] = "lexical",
+    case_sensitive: Annotated[bool, Query()] = False,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> list[SearchResult]:
+    """Search indexed repository chunks using lexical or exact matching."""
+    _get_repository(session, repository_id)
+    try:
+        if mode == "exact":
+            return exact_search(
+                session,
+                repository_id,
+                q,
+                case_sensitive=case_sensitive,
+                limit=limit,
+            )
+        return lexical_search(session, repository_id, q, limit=limit)
+    except InvalidSearchQueryError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
+
+
+@router.get("/{repository_id}/symbols", response_model=list[SymbolSearchResultResponse])
+def search_repository_symbols(
+    repository_id: uuid.UUID,
+    session: SessionDependency,
+    q: Annotated[str, Query(min_length=1, max_length=500)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> list[SymbolSearchResult]:
+    """Search persisted Python symbols by name or qualified name."""
+    _get_repository(session, repository_id)
+    try:
+        return symbol_search(session, repository_id, q, limit=limit)
+    except InvalidSearchQueryError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
 
 
 def _get_repository(session: Session, repository_id: uuid.UUID) -> Repository:
