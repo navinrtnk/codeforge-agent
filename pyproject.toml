@@ -9,7 +9,9 @@ description = "A lightweight AI software engineering agent for repository unders
 readme = "README.md"
 requires-python = ">=3.14,<3.15"
 dependencies = [
+    "anthropic>=1,<2",
     "fastapi>=0.116,<1",
+    "openai>=2,<3",
     "pydantic-settings>=2.10,<3",
     "sqlalchemy>=2.0,<3",
     "uvicorn[standard]>=0.35,<1",

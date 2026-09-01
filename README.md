@@ -103,6 +103,26 @@ Search results are restricted to the requested repository and include file path,
 language, line range, and a matching snippet. Python symbols are extracted with
 the standard-library AST and refreshed during incremental indexing.
 
+## Model providers
+
+CodeForge Agent has a provider-neutral async model interface with adapters for the
+OpenAI Responses API and Anthropic Messages API. Configure one provider in `.env`:
+
+```dotenv
+CODEFORGE_MODEL_PROVIDER=openai
+CODEFORGE_MODEL_NAME=YOUR_MODEL_ID
+CODEFORGE_OPENAI_API_KEY=YOUR_API_KEY
+```
+
+For Anthropic, set `CODEFORGE_MODEL_PROVIDER=anthropic` and provide
+`CODEFORGE_ANTHROPIC_API_KEY`. Model IDs are intentionally configuration values so
+the application does not silently change models. Credentials are validated when a
+real provider client is created, not when the FastAPI service starts.
+
+The normalized interface preserves text, parallel tool calls, tool results, stop
+reasons, and token usage. A deterministic fake client supports agent-loop tests
+without API credentials or network requests.
+
 ## Development
 
 Run all quality checks:
