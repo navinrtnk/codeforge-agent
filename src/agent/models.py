@@ -166,6 +166,7 @@ class ToolEvent(Base):
     """A persisted tool invocation from an agent run."""
 
     __tablename__ = "tool_events"
+    __table_args__ = (UniqueConstraint("agent_run_id", "sequence_number"),)
 
     id: Mapped[uuid.UUID] = mapped_column(SqlUuid, primary_key=True, default=uuid.uuid4)
     agent_run_id: Mapped[uuid.UUID] = mapped_column(
@@ -173,6 +174,7 @@ class ToolEvent(Base):
         index=True,
     )
     sequence_number: Mapped[int] = mapped_column(Integer)
+    tool_call_id: Mapped[str] = mapped_column(String(255))
     tool_name: Mapped[str] = mapped_column(String(255))
     arguments: Mapped[dict[str, Any]] = mapped_column(JSON)
     result: Mapped[dict[str, Any] | None] = mapped_column(JSON)

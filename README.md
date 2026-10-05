@@ -123,6 +123,20 @@ The normalized interface preserves text, parallel tool calls, tool results, stop
 reasons, and token usage. A deterministic fake client supports agent-loop tests
 without API credentials or network requests.
 
+## Repository tools
+
+The tool registry is an explicit allowlist. It currently exposes read-only tools
+to list repository files, read UTF-8 source files, and search the persisted code
+index. Pydantic schemas validate every model-generated argument before execution,
+and the trusted application context fixes the active repository so a tool call
+cannot select an arbitrary workspace.
+
+Every invocation is recorded against its agent run with sanitized arguments,
+result, duration, and error state. Common credentials are redacted before storage
+or model consumption, and `CODEFORGE_MAX_TOOL_OUTPUT_BYTES` bounds each result.
+Unknown tools, malformed arguments, path traversal, and unexpected execution
+failures return safe errors. No shell, write, or Git mutation tool is registered.
+
 ## Development
 
 Run all quality checks:

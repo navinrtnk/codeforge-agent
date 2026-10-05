@@ -16,6 +16,7 @@ def test_models_and_relationships_are_persisted() -> None:
         event = ToolEvent(
             run=run,
             sequence_number=1,
+            tool_call_id="call-1",
             tool_name="read_file",
             arguments={"path": "src/example.py"},
             result={"content": "pass"},
@@ -47,7 +48,14 @@ def test_deleting_repository_cascades_to_agent_activity() -> None:
     with database.session_factory() as session:
         repository = Repository(name="Example", path="/tmp/example")
         run = AgentRun(repository=repository, task="Review the change")
-        run.tool_events.append(ToolEvent(sequence_number=1, tool_name="git_diff", arguments={}))
+        run.tool_events.append(
+            ToolEvent(
+                sequence_number=1,
+                tool_call_id="call-1",
+                tool_name="git_diff",
+                arguments={},
+            )
+        )
         session.add(repository)
         session.commit()
         session.delete(repository)
