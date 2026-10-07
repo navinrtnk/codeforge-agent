@@ -137,6 +137,28 @@ or model consumption, and `CODEFORGE_MAX_TOOL_OUTPUT_BYTES` bounds each result.
 Unknown tools, malformed arguments, path traversal, and unexpected execution
 failures return safe errors. No shell, write, or Git mutation tool is registered.
 
+## Agent runs
+
+Create a bounded agent run for a registered repository:
+
+```bash
+curl -X POST http://127.0.0.1:8000/repositories/REPOSITORY_ID/runs \
+  -H "Content-Type: application/json" \
+  -d '{"task":"Explain how repository indexing works"}'
+```
+
+The runner sends the task and registered tool schemas to the configured model,
+executes requested tools, returns their sanitized results, and repeats until the
+model produces a final answer. Every conversation message, provider token count,
+and tool event is persisted. List runs at
+`/repositories/REPOSITORY_ID/runs` or retrieve one at
+`/repositories/REPOSITORY_ID/runs/RUN_ID`.
+
+`CODEFORGE_AGENT_MAX_ITERATIONS`, `CODEFORGE_AGENT_MAX_OUTPUT_TOKENS`, and
+`CODEFORGE_AGENT_TIMEOUT_SECONDS` bound model execution. Runs that exceed a limit
+or encounter a provider failure are retained with a `failed` status and a safe
+error message.
+
 ## Development
 
 Run all quality checks:

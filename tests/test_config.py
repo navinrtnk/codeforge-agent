@@ -18,6 +18,9 @@ def test_settings_have_development_defaults() -> None:
     assert settings.max_file_size_bytes == 1_000_000
     assert settings.index_chunk_size_lines == 200
     assert settings.max_tool_output_bytes == 100_000
+    assert settings.agent_max_iterations == 8
+    assert settings.agent_max_output_tokens == 4096
+    assert settings.agent_timeout_seconds == 120.0
     assert settings.model_provider == "openai"
 
 
@@ -29,6 +32,9 @@ def test_settings_load_environment_overrides(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setenv("CODEFORGE_MAX_FILE_SIZE_BYTES", "2048")
     monkeypatch.setenv("CODEFORGE_INDEX_CHUNK_SIZE_LINES", "50")
     monkeypatch.setenv("CODEFORGE_MAX_TOOL_OUTPUT_BYTES", "4096")
+    monkeypatch.setenv("CODEFORGE_AGENT_MAX_ITERATIONS", "3")
+    monkeypatch.setenv("CODEFORGE_AGENT_MAX_OUTPUT_TOKENS", "1024")
+    monkeypatch.setenv("CODEFORGE_AGENT_TIMEOUT_SECONDS", "30")
 
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
 
@@ -38,6 +44,9 @@ def test_settings_load_environment_overrides(monkeypatch: pytest.MonkeyPatch) ->
     assert settings.max_file_size_bytes == 2048
     assert settings.index_chunk_size_lines == 50
     assert settings.max_tool_output_bytes == 4096
+    assert settings.agent_max_iterations == 3
+    assert settings.agent_max_output_tokens == 1024
+    assert settings.agent_timeout_seconds == 30.0
     assert settings.openai_api_key is not None
     assert settings.openai_api_key.get_secret_value() == "secret-value"
     assert "secret-value" not in repr(settings)

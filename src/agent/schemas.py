@@ -3,8 +3,11 @@
 import uuid
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from agent.models import AgentMessageRole, AgentRunStatus
 
 
 class RepositoryCreate(BaseModel):
@@ -67,3 +70,58 @@ class SymbolSearchResultResponse(BaseModel):
     signature: str
     start_line: int
     end_line: int
+
+
+class AgentRunCreate(BaseModel):
+    """A task to execute against a registered repository."""
+
+    task: str = Field(min_length=1, max_length=20_000)
+
+
+class AgentMessageResponse(BaseModel):
+    """A persisted message from an agent conversation."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    sequence_number: int
+    role: AgentMessageRole
+    content: list[dict[str, Any]]
+    response_id: str | None
+    provider: str | None
+    model: str | None
+    stop_reason: str | None
+    input_tokens: int | None
+    output_tokens: int | None
+    created_at: datetime
+
+
+class ToolEventResponse(BaseModel):
+    """A sanitized persisted tool invocation."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    sequence_number: int
+    tool_call_id: str
+    tool_name: str
+    arguments: dict[str, Any]
+    result: dict[str, Any] | None
+    is_error: bool
+    duration_ms: float | None
+    created_at: datetime
+
+
+class AgentRunResponse(BaseModel):
+    """Public representation of an agent run and its conversation."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    repository_id: uuid.UUID
+    task: str
+    status: AgentRunStatus
+    error_message: str | None
+    created_at: datetime
+    started_at: datetime | None
+    completed_at: datetime | None
+    messages: list[AgentMessageResponse]
+    tool_events: list[ToolEventResponse]

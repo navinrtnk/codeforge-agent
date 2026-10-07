@@ -3,7 +3,14 @@
 from sqlalchemy import select
 
 from agent.database import Database
-from agent.models import AgentRun, AgentRunStatus, Repository, ToolEvent
+from agent.models import (
+    AgentMessage,
+    AgentMessageRole,
+    AgentRun,
+    AgentRunStatus,
+    Repository,
+    ToolEvent,
+)
 
 
 def test_models_and_relationships_are_persisted() -> None:
@@ -22,6 +29,12 @@ def test_models_and_relationships_are_persisted() -> None:
             result={"content": "pass"},
             duration_ms=12.5,
         )
+        message = AgentMessage(
+            run=run,
+            sequence_number=1,
+            role=AgentMessageRole.USER,
+            content=[{"type": "text", "text": "Fix the failing test"}],
+        )
         session.add(repository)
         session.commit()
 
@@ -34,6 +47,7 @@ def test_models_and_relationships_are_persisted() -> None:
         assert stored_run is not None
         assert stored_run.status is AgentRunStatus.PENDING
         assert stored_run.tool_events == [event]
+        assert stored_run.messages == [message]
         assert stored_event is not None
         assert stored_event.arguments == {"path": "src/example.py"}
         assert stored_event.is_error is False
@@ -56,6 +70,13 @@ def test_deleting_repository_cascades_to_agent_activity() -> None:
                 arguments={},
             )
         )
+        run.messages.append(
+            AgentMessage(
+                sequence_number=1,
+                role=AgentMessageRole.USER,
+                content=[{"type": "text", "text": "Review the change"}],
+            )
+        )
         session.add(repository)
         session.commit()
         session.delete(repository)
@@ -64,5 +85,6 @@ def test_deleting_repository_cascades_to_agent_activity() -> None:
         assert session.scalar(select(Repository)) is None
         assert session.scalar(select(AgentRun)) is None
         assert session.scalar(select(ToolEvent)) is None
+        assert session.scalar(select(AgentMessage)) is None
 
     database.dispose()

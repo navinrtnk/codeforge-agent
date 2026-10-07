@@ -19,6 +19,7 @@ from sqlalchemy import (
 )
 from sqlalchemy import Uuid as SqlUuid
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.types import TypeDecorator
 
 
 class Base(DeclarativeBase):
@@ -30,6 +31,27 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+class UTCDateTime(TypeDecorator[datetime]):
+    """Store timestamps portably and always restore UTC-aware values."""
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value: datetime | None, dialect: object) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
+
+    def process_result_value(self, value: datetime | None, dialect: object) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
+
+
 class AgentRunStatus(enum.StrEnum):
     """Lifecycle states for an agent run."""
 
@@ -37,6 +59,14 @@ class AgentRunStatus(enum.StrEnum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+
+
+class AgentMessageRole(enum.StrEnum):
+    """Roles stored in an agent conversation."""
+
+    SYSTEM = "system"
+    USER = "user"
+    ASSISTANT = "assistant"
 
 
 class Repository(Base):
@@ -47,9 +77,9 @@ class Repository(Base):
     id: Mapped[uuid.UUID] = mapped_column(SqlUuid, primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255))
     path: Mapped[str] = mapped_column(Text, unique=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UTCDateTime(),
         default=utc_now,
         onupdate=utc_now,
     )
@@ -80,7 +110,7 @@ class IndexedFile(Base):
     language: Mapped[str] = mapped_column(String(64))
     size_bytes: Mapped[int] = mapped_column(Integer)
     chunk_size_lines: Mapped[int] = mapped_column(Integer)
-    indexed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    indexed_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utc_now)
 
     repository: Mapped[Repository] = relationship(back_populates="indexed_files")
     chunks: Mapped[list[CodeChunk]] = relationship(
@@ -150,9 +180,9 @@ class AgentRun(Base):
         default=AgentRunStatus.PENDING,
     )
     error_message: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utc_now)
+    started_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     repository: Mapped[Repository] = relationship(back_populates="runs")
     tool_events: Mapped[list[ToolEvent]] = relationship(
@@ -160,6 +190,36 @@ class AgentRun(Base):
         cascade="all, delete-orphan",
         order_by="ToolEvent.sequence_number",
     )
+    messages: Mapped[list[AgentMessage]] = relationship(
+        back_populates="run",
+        cascade="all, delete-orphan",
+        order_by="AgentMessage.sequence_number",
+    )
+
+
+class AgentMessage(Base):
+    """One persisted message in an agent run conversation."""
+
+    __tablename__ = "agent_messages"
+    __table_args__ = (UniqueConstraint("agent_run_id", "sequence_number"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(SqlUuid, primary_key=True, default=uuid.uuid4)
+    agent_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="CASCADE"),
+        index=True,
+    )
+    sequence_number: Mapped[int] = mapped_column(Integer)
+    role: Mapped[AgentMessageRole] = mapped_column(Enum(AgentMessageRole, native_enum=False))
+    content: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
+    response_id: Mapped[str | None] = mapped_column(String(255))
+    provider: Mapped[str | None] = mapped_column(String(32))
+    model: Mapped[str | None] = mapped_column(String(255))
+    stop_reason: Mapped[str | None] = mapped_column(String(32))
+    input_tokens: Mapped[int | None] = mapped_column(Integer)
+    output_tokens: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utc_now)
+
+    run: Mapped[AgentRun] = relationship(back_populates="messages")
 
 
 class ToolEvent(Base):
@@ -180,6 +240,6 @@ class ToolEvent(Base):
     result: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     is_error: Mapped[bool] = mapped_column(Boolean, default=False)
     duration_ms: Mapped[float | None] = mapped_column(Float)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utc_now)
 
     run: Mapped[AgentRun] = relationship(back_populates="tool_events")
