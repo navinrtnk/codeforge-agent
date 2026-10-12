@@ -35,6 +35,7 @@ def create_app(
     )
     application.state.settings = application_settings
     application.state.model_client = model_client
+    application.state.git_service = None
 
     @application.get("/health", tags=["system"])
     async def health() -> dict[str, str]:

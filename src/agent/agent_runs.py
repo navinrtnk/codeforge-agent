@@ -9,11 +9,12 @@ from sqlalchemy.orm import Session
 
 from agent.agent_runner import AgentRunner
 from agent.database import get_database_session
+from agent.git_service import GitService
+from agent.git_tools import create_agent_tool_registry
 from agent.model_factory import create_model_client
 from agent.models import AgentRun, Repository
 from agent.models_api import ModelClient, ModelConfigurationError
 from agent.repositories import RepositoryAccessDependency
-from agent.repository_tools import create_repository_tool_registry
 from agent.schemas import AgentRunCreate, AgentRunResponse
 
 router = APIRouter(prefix="/repositories/{repository_id}/runs", tags=["agent runs"])
@@ -50,9 +51,18 @@ async def create_agent_run(
     """Execute one bounded agent task against a registered repository."""
     repository = _get_repository(session, repository_id)
     settings = request.app.state.settings
+    git_service: GitService | None = request.app.state.git_service
+    if git_service is None:
+        git_service = GitService(
+            access,
+            allow_mutations=settings.git_allow_mutations,
+            timeout_seconds=settings.git_timeout_seconds,
+            max_output_bytes=settings.git_max_output_bytes,
+        )
+        request.app.state.git_service = git_service
     runner = AgentRunner(
         model_client,
-        create_repository_tool_registry(),
+        create_agent_tool_registry(git_service),
         access,
         max_iterations=settings.agent_max_iterations,
         max_output_tokens=settings.agent_max_output_tokens,

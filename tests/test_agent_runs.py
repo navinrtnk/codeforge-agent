@@ -1,12 +1,13 @@
 """Tests for agent run API endpoints."""
 
+import subprocess
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from agent.config import Settings
 from agent.main import create_app
-from agent.models_api import FakeModelClient, ModelResponse, TextContent, TokenUsage
+from agent.models_api import FakeModelClient, ModelResponse, TextContent, TokenUsage, ToolCall
 
 
 def final_client(text: str = "Repository inspected") -> FakeModelClient:
@@ -99,3 +100,37 @@ def test_agent_run_endpoints_reject_unknown_resources(tmp_path: Path) -> None:
     assert missing_repository.status_code == 404
     assert missing_run.status_code == 404
     assert missing_run.json() == {"detail": "Agent run does not exist"}
+
+
+def test_agent_run_uses_git_tools_and_records_results(tmp_path: Path) -> None:
+    model = final_client()
+    model.responses.insert(
+        0,
+        ModelResponse(
+            id="git-response",
+            provider="fake",
+            model="test-model",
+            content=(ToolCall("status-call", "git_status", {}),),
+            stop_reason="tool_use",
+            usage=TokenUsage(10, 5),
+        ),
+    )
+    with create_test_client(tmp_path, model) as client:
+        repository_id = register_repository(client, tmp_path)
+        subprocess.run(
+            ["git", "-C", str(tmp_path / "repository"), "init", "-b", "main"],
+            check=True,
+            capture_output=True,
+        )
+        response = client.post(
+            f"/repositories/{repository_id}/runs", json={"task": "Inspect Git status"}
+        )
+        body = response.json()
+        fetched = client.get(f"/repositories/{repository_id}/runs/{body['id']}")
+    assert response.status_code == 201
+    assert body["status"] == "completed"
+    assert body["tool_events"][0]["tool_name"] == "git_status"
+    assert body["tool_events"][0]["result"]["branch"] == "main"
+    assert fetched.json()["tool_events"] == body["tool_events"]
+    assert "git_status" in {definition.name for definition in model.requests[0].tools}
+    assert "git_commit" not in {definition.name for definition in model.requests[0].tools}

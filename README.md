@@ -7,6 +7,7 @@ A lightweight AI software engineering agent built with Python and FastAPI.
 ## Requirements
 
 - Python 3.14.7
+- Git (available on `PATH` for Git tools)
 - [uv](https://docs.astral.sh/uv/)
 - Make (optional)
 
@@ -135,7 +136,8 @@ Every invocation is recorded against its agent run with sanitized arguments,
 result, duration, and error state. Common credentials are redacted before storage
 or model consumption, and `CODEFORGE_MAX_TOOL_OUTPUT_BYTES` bounds each result.
 Unknown tools, malformed arguments, path traversal, and unexpected execution
-failures return safe errors. No shell, write, or Git mutation tool is registered.
+failures return safe errors. Git inspection tools are available by default;
+Git mutation tools are registered only when explicitly enabled in configuration.
 
 ## Agent runs
 
@@ -158,6 +160,51 @@ and tool event is persisted. List runs at
 `CODEFORGE_AGENT_TIMEOUT_SECONDS` bound model execution. Runs that exceed a limit
 or encounter a provider failure are retained with a `failed` status and a safe
 error message.
+
+## Local Git integration
+
+Agent runs can use `git_status`, `git_diff`, `git_log`, and `git_branches` to
+inspect the active repository. `git_diff` accepts `staged=true` to review the
+index, and `git_log` accepts a `limit` from 1 to 100. Registered directories must
+be Git working tree roots, with Git metadata inside `CODEFORGE_WORKSPACE_ROOT`.
+File inspection tools still work for registered directories without Git.
+
+Enable local mutations with `CODEFORGE_GIT_ALLOW_MUTATIONS=true`. This adds:
+
+| Tool | Behavior |
+| --- | --- |
+| `git_create_branch` | Create a named local branch at HEAD without switching |
+| `git_checkout` | Switch to an existing local branch when the working tree is clean |
+| `git_stage` | Stage explicit relative file paths, including tracked deletions |
+| `git_unstage` | Unstage explicit files while preserving working files |
+| `git_commit` | Commit the entire staged index with the supplied message |
+
+Branch tools accept `name`, staging tools accept a `paths` array, and the commit
+tool accepts `message`. Configure `user.name` and `user.email` locally in each
+repository before committing; global Git configuration is not loaded. Review
+status and the staged diff before requesting a commit. For example, ask the agent
+to stage `src/example.py`, review the staged patch, and commit it with the message
+`fix example validation`.
+
+Commands run asynchronously without a shell. `CODEFORGE_GIT_TIMEOUT_SECONDS`
+limits each command, and `CODEFORGE_GIT_MAX_OUTPUT_BYTES` limits each captured
+output stream. Commands that exceed either limit are stopped and reported as
+tool errors. Git events use the same redacted audit history as repository tools.
+
+Branch switches reject staged, unstaged, or untracked changes. Mutations reject
+merge conflicts and active merge/rebase operations, and commits reject detached
+HEAD and empty indexes. Unstaging is the supported way to reverse staging; it
+also works before the initial commit. Hooks, external diff, text conversion,
+submodule recursion, signing, and automatic maintenance are disabled. Repositories
+with configured Git filters are rejected to prevent filters running during file
+comparison or staging. Remote operations and destructive history/worktree reset
+operations are not exposed.
+
+Use mutation tools with trusted local repositories in one application worker.
+Mutations are serialized per repository inside that worker; external Git clients
+and multiple workers are not coordinated. Submodule worktree changes are excluded
+from inspection. If a command times out after changing Git state, inspect status
+before retrying; the service does not automatically reset or delete working files.
 
 ## Development
 
