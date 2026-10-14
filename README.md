@@ -161,6 +161,65 @@ and tool event is persisted. List runs at
 or encounter a provider failure are retained with a `failed` status and a safe
 error message.
 
+## Conversation memory
+
+Create a discussion attached to a registered repository:
+
+```bash
+curl -X POST http://127.0.0.1:8000/repositories/REPOSITORY_ID/conversations \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Understand validation"}'
+```
+
+Append a question using the returned conversation ID:
+
+```bash
+curl -X POST http://127.0.0.1:8000/repositories/REPOSITORY_ID/conversations/CONVERSATION_ID/messages \
+  -H "Content-Type: application/json" \
+  -d '{"content":"How is repository access validated?"}'
+```
+
+Send follow-up questions to the same endpoint to continue with earlier context.
+Each append executes synchronously and returns a normal agent run with messages,
+tool events, and completion status. Context persists across application restarts.
+Standalone `/runs` requests remain independent of conversations.
+
+| Endpoint | Behavior |
+| --- | --- |
+| `GET /repositories/{id}/conversations` | List discussions, with `offset` and `limit` |
+| `GET /repositories/{id}/conversations/{conversation_id}` | Inspect metadata and summary |
+| `GET /repositories/{id}/conversations/{conversation_id}/messages` | Read original messages, with `offset` and `limit` |
+
+Messages include their run ID and turn number. Historical messages remain stored
+once trimmed from model context, including failed turns. Only completed turns
+are replayed, and system instructions are rebuilt for each run. Ordered
+conversation turns link to the existing run/message records; startup adds two
+new tables without changing or deleting existing runs.
+
+`CODEFORGE_CONVERSATION_HISTORY_TOKEN_BUDGET` limits prior context (default 8192).
+The provider-neutral estimator conservatively counts one token per serialized
+UTF-8 byte plus message overhead; it is not an exact provider tokenizer. This
+budget covers historical messages and their summary, excluding the current task,
+system prompt, tool schemas, and the current run's new tool exchanges. Trimming
+keeps the newest complete turns so tool calls and results are never split.
+
+Older dialogue is summarized using the configured model. Summaries focus on user
+goals, preferences, decisions, and open questions; raw tool output is excluded.
+`CODEFORGE_CONVERSATION_SUMMARY_MAX_TOKENS` limits each summary response (default
+512), and `CODEFORGE_CONVERSATION_SUMMARY_INPUT_TOKEN_BUDGET` caps source excerpt
+bytes per summary call (default 8192, excluding fixed instructions). Large sources
+are processed in batches with the preceding summary. The checkpoint is saved
+only when every batch succeeds. Summaries are redacted and shortened to fit their
+reserved share of history context. They are lossy, untrusted memory, and repository
+facts must be checked against current files or the index.
+
+A summary failure returns `502`, a summary timeout returns `504`, and an overlapping
+append returns `409`. Summary generation and run execution each use
+`CODEFORGE_AGENT_TIMEOUT_SECONDS`. Normal failures and request cancellation release
+the database claim. Abrupt process termination can leave `is_running` set;
+automatic crash recovery is not included. Summary calls add provider usage beyond
+the token counts recorded on the subsequent agent run.
+
 ## Local Git integration
 
 Agent runs can use `git_status`, `git_diff`, `git_log`, and `git_branches` to

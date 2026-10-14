@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from agent.models import AgentMessageRole, AgentRunStatus
 
@@ -78,6 +78,41 @@ class AgentRunCreate(BaseModel):
     task: str = Field(min_length=1, max_length=20_000)
 
 
+class ConversationCreate(BaseModel):
+    """Create a named discussion for one registered repository."""
+
+    title: str = Field(default="Repository conversation", min_length=1, max_length=255)
+
+
+class ConversationMessageCreate(BaseModel):
+    """A follow-up task to append to a conversation."""
+
+    content: str = Field(min_length=1, max_length=20_000)
+
+    @field_validator("content")
+    @classmethod
+    def reject_blank_content(cls, value: str) -> str:
+        """Reject whitespace before allocating a run or claiming a conversation."""
+        if not value.strip():
+            raise ValueError("Message must not be blank")
+        return value
+
+
+class ConversationResponse(BaseModel):
+    """Conversation metadata and its current compacted history."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    repository_id: uuid.UUID
+    title: str
+    summary: str | None
+    summary_through_turn: int
+    is_running: bool
+    created_at: datetime
+    updated_at: datetime
+
+
 class AgentMessageResponse(BaseModel):
     """A persisted message from an agent conversation."""
 
@@ -93,6 +128,13 @@ class AgentMessageResponse(BaseModel):
     input_tokens: int | None
     output_tokens: int | None
     created_at: datetime
+
+
+class ConversationMessageResponse(AgentMessageResponse):
+    """An original persisted message with conversation ordering and run provenance."""
+
+    run_id: uuid.UUID
+    turn_number: int
 
 
 class ToolEventResponse(BaseModel):

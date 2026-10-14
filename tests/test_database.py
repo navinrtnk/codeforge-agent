@@ -8,6 +8,8 @@ from agent.models import (
     AgentMessageRole,
     AgentRun,
     AgentRunStatus,
+    Conversation,
+    ConversationTurn,
     Repository,
     ToolEvent,
 )
@@ -62,6 +64,8 @@ def test_deleting_repository_cascades_to_agent_activity() -> None:
     with database.session_factory() as session:
         repository = Repository(name="Example", path="/tmp/example")
         run = AgentRun(repository=repository, task="Review the change")
+        conversation = Conversation(repository=repository, title="Review discussion")
+        conversation.turns.append(ConversationTurn(run=run, sequence_number=1))
         run.tool_events.append(
             ToolEvent(
                 sequence_number=1,
@@ -86,5 +90,7 @@ def test_deleting_repository_cascades_to_agent_activity() -> None:
         assert session.scalar(select(AgentRun)) is None
         assert session.scalar(select(ToolEvent)) is None
         assert session.scalar(select(AgentMessage)) is None
+        assert session.scalar(select(Conversation)) is None
+        assert session.scalar(select(ConversationTurn)) is None
 
     database.dispose()

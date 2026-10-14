@@ -92,6 +92,56 @@ class Repository(Base):
         back_populates="repository",
         cascade="all, delete-orphan",
     )
+    conversations: Mapped[list[Conversation]] = relationship(
+        back_populates="repository",
+        cascade="all, delete-orphan",
+    )
+
+
+class Conversation(Base):
+    """A continuing, repository-scoped discussion with compacted older history."""
+
+    __tablename__ = "conversations"
+
+    id: Mapped[uuid.UUID] = mapped_column(SqlUuid, primary_key=True, default=uuid.uuid4)
+    repository_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("repositories.id", ondelete="CASCADE"),
+        index=True,
+    )
+    title: Mapped[str] = mapped_column(String(255))
+    summary: Mapped[str | None] = mapped_column(Text)
+    summary_through_turn: Mapped[int] = mapped_column(Integer, default=0)
+    is_running: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utc_now, onupdate=utc_now)
+
+    repository: Mapped[Repository] = relationship(back_populates="conversations")
+    turns: Mapped[list[ConversationTurn]] = relationship(
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        order_by="ConversationTurn.sequence_number",
+    )
+
+
+class ConversationTurn(Base):
+    """Associate a run and its existing message records with an ordered conversation turn."""
+
+    __tablename__ = "conversation_turns"
+    __table_args__ = (UniqueConstraint("conversation_id", "sequence_number"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(SqlUuid, primary_key=True, default=uuid.uuid4)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        index=True,
+    )
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="CASCADE"),
+        unique=True,
+    )
+    sequence_number: Mapped[int] = mapped_column(Integer)
+
+    conversation: Mapped[Conversation] = relationship(back_populates="turns")
+    run: Mapped[AgentRun] = relationship()
 
 
 class IndexedFile(Base):

@@ -15,6 +15,7 @@ from agent.model_factory import create_model_client
 from agent.models import AgentRun, Repository
 from agent.models_api import ModelClient, ModelConfigurationError
 from agent.repositories import RepositoryAccessDependency
+from agent.repository_access import RepositoryAccess
 from agent.schemas import AgentRunCreate, AgentRunResponse
 
 router = APIRouter(prefix="/repositories/{repository_id}/runs", tags=["agent runs"])
@@ -50,6 +51,16 @@ async def create_agent_run(
 ) -> AgentRun:
     """Execute one bounded agent task against a registered repository."""
     repository = _get_repository(session, repository_id)
+    runner = build_agent_runner(request, access, model_client)
+    return await runner.run(session, repository, payload.task)
+
+
+def build_agent_runner(
+    request: Request,
+    access: RepositoryAccess,
+    model_client: ModelClient,
+) -> AgentRunner:
+    """Build the same configured runner for standalone and conversation tasks."""
     settings = request.app.state.settings
     git_service: GitService | None = request.app.state.git_service
     if git_service is None:
@@ -60,7 +71,7 @@ async def create_agent_run(
             max_output_bytes=settings.git_max_output_bytes,
         )
         request.app.state.git_service = git_service
-    runner = AgentRunner(
+    return AgentRunner(
         model_client,
         create_agent_tool_registry(git_service),
         access,
@@ -69,7 +80,6 @@ async def create_agent_run(
         timeout_seconds=settings.agent_timeout_seconds,
         max_tool_output_bytes=settings.max_tool_output_bytes,
     )
-    return await runner.run(session, repository, payload.task)
 
 
 @router.get("", response_model=list[AgentRunResponse])

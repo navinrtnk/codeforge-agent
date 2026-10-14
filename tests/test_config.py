@@ -21,6 +21,9 @@ def test_settings_have_development_defaults() -> None:
     assert settings.agent_max_iterations == 8
     assert settings.agent_max_output_tokens == 4096
     assert settings.agent_timeout_seconds == 120.0
+    assert settings.conversation_history_token_budget == 8192
+    assert settings.conversation_summary_max_tokens == 512
+    assert settings.conversation_summary_input_token_budget == 8192
     assert settings.git_allow_mutations is False
     assert settings.git_timeout_seconds == 15.0
     assert settings.git_max_output_bytes == 100_000
@@ -38,6 +41,9 @@ def test_settings_load_environment_overrides(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setenv("CODEFORGE_AGENT_MAX_ITERATIONS", "3")
     monkeypatch.setenv("CODEFORGE_AGENT_MAX_OUTPUT_TOKENS", "1024")
     monkeypatch.setenv("CODEFORGE_AGENT_TIMEOUT_SECONDS", "30")
+    monkeypatch.setenv("CODEFORGE_CONVERSATION_HISTORY_TOKEN_BUDGET", "1024")
+    monkeypatch.setenv("CODEFORGE_CONVERSATION_SUMMARY_MAX_TOKENS", "128")
+    monkeypatch.setenv("CODEFORGE_CONVERSATION_SUMMARY_INPUT_TOKEN_BUDGET", "2048")
     monkeypatch.setenv("CODEFORGE_GIT_ALLOW_MUTATIONS", "true")
     monkeypatch.setenv("CODEFORGE_GIT_TIMEOUT_SECONDS", "10")
     monkeypatch.setenv("CODEFORGE_GIT_MAX_OUTPUT_BYTES", "4096")
@@ -53,6 +59,9 @@ def test_settings_load_environment_overrides(monkeypatch: pytest.MonkeyPatch) ->
     assert settings.agent_max_iterations == 3
     assert settings.agent_max_output_tokens == 1024
     assert settings.agent_timeout_seconds == 30.0
+    assert settings.conversation_history_token_budget == 1024
+    assert settings.conversation_summary_max_tokens == 128
+    assert settings.conversation_summary_input_token_budget == 2048
     assert settings.git_allow_mutations is True
     assert settings.git_timeout_seconds == 10.0
     assert settings.git_max_output_bytes == 4096

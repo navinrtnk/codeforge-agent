@@ -7,6 +7,7 @@ from fastapi import FastAPI
 
 from agent.agent_runs import router as agent_runs_router
 from agent.config import Settings, get_settings
+from agent.conversations import router as conversations_router
 from agent.database import Database
 from agent.models_api import ModelClient
 from agent.repositories import router as repositories_router
@@ -44,6 +45,7 @@ def create_app(
 
     application.include_router(repositories_router)
     application.include_router(agent_runs_router)
+    application.include_router(conversations_router)
     return application
 
 
