@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     git_allow_mutations: bool = False
     git_timeout_seconds: float = Field(default=15.0, gt=0)
     git_max_output_bytes: int = Field(default=100_000, ge=256)
+    git_context_max_bytes: int = Field(default=16_000, ge=512)
+    git_context_max_files: int = Field(default=50, ge=1, le=1000)
+    git_context_timeout_seconds: float = Field(default=5.0, gt=0)
     model_provider: Literal["openai", "anthropic"] = "openai"
     model_name: str | None = None
     openai_api_key: SecretStr | None = None

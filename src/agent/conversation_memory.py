@@ -56,6 +56,9 @@ def restore_message(stored: AgentMessage) -> Message:
     """Restore the neutral provider contract from a persisted run message."""
     blocks: list[MessageContent] = []
     for block in stored.content:
+        if block["type"] == "repository_context":
+            # Initial snapshots remain auditable but must be refreshed, not replayed.
+            continue
         if block["type"] == "text":
             blocks.append(TextContent(block["text"]))
         elif block["type"] == "tool_call":

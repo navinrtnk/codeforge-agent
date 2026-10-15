@@ -79,6 +79,10 @@ def build_agent_runner(
         max_output_tokens=settings.agent_max_output_tokens,
         timeout_seconds=settings.agent_timeout_seconds,
         max_tool_output_bytes=settings.max_tool_output_bytes,
+        git_service=git_service,
+        git_context_max_bytes=settings.git_context_max_bytes,
+        git_context_max_files=settings.git_context_max_files,
+        git_context_timeout_seconds=settings.git_context_timeout_seconds,
     )
 
 

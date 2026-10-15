@@ -27,6 +27,9 @@ def test_settings_have_development_defaults() -> None:
     assert settings.git_allow_mutations is False
     assert settings.git_timeout_seconds == 15.0
     assert settings.git_max_output_bytes == 100_000
+    assert settings.git_context_max_bytes == 16_000
+    assert settings.git_context_max_files == 50
+    assert settings.git_context_timeout_seconds == 5.0
     assert settings.model_provider == "openai"
 
 
@@ -47,6 +50,9 @@ def test_settings_load_environment_overrides(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setenv("CODEFORGE_GIT_ALLOW_MUTATIONS", "true")
     monkeypatch.setenv("CODEFORGE_GIT_TIMEOUT_SECONDS", "10")
     monkeypatch.setenv("CODEFORGE_GIT_MAX_OUTPUT_BYTES", "4096")
+    monkeypatch.setenv("CODEFORGE_GIT_CONTEXT_MAX_BYTES", "2048")
+    monkeypatch.setenv("CODEFORGE_GIT_CONTEXT_MAX_FILES", "10")
+    monkeypatch.setenv("CODEFORGE_GIT_CONTEXT_TIMEOUT_SECONDS", "2")
 
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
 
@@ -65,6 +71,9 @@ def test_settings_load_environment_overrides(monkeypatch: pytest.MonkeyPatch) ->
     assert settings.git_allow_mutations is True
     assert settings.git_timeout_seconds == 10.0
     assert settings.git_max_output_bytes == 4096
+    assert settings.git_context_max_bytes == 2048
+    assert settings.git_context_max_files == 10
+    assert settings.git_context_timeout_seconds == 2.0
     assert settings.openai_api_key is not None
     assert settings.openai_api_key.get_secret_value() == "secret-value"
     assert "secret-value" not in repr(settings)

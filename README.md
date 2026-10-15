@@ -228,6 +228,36 @@ index, and `git_log` accepts a `limit` from 1 to 100. Registered directories mus
 be Git working tree roots, with Git metadata inside `CODEFORGE_WORKSPACE_ROOT`.
 File inspection tools still work for registered directories without Git.
 
+Every standalone run and conversation follow-up automatically collects a fresh
+Git snapshot before the first model request. It includes the branch, HEAD,
+clean/detached state, changed-file statuses and paths, and previews of staged and
+unstaged patches. Untracked files are listed by name without reading their
+contents. Deleted and renamed paths are included in Git status. A snapshot is
+historical evidence from the start of the run; the agent should use inspection
+tools to check details and recheck state before mutations.
+
+Snapshots are redacted before they reach the model or database. They appear as
+untrusted data alongside the current task, and are saved as a
+`repository_context` block in that run's user message. Conversation history and
+summary generation exclude these blocks so follow-ups receive current Git state
+rather than replaying older snapshots.
+
+Configure automatic context with:
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `CODEFORGE_GIT_CONTEXT_MAX_BYTES` | `16000` | Maximum serialized snapshot JSON bytes, excluding fixed prompt framing |
+| `CODEFORGE_GIT_CONTEXT_MAX_FILES` | `50` | Maximum changed-file entries in the snapshot |
+| `CODEFORGE_GIT_CONTEXT_TIMEOUT_SECONDS` | `5` | Total snapshot collection deadline, within the agent run timeout |
+
+File metadata is prioritized over patch previews. Truncated file lists retain the
+total count, and patch previews indicate whether they were truncated or unavailable.
+Exceptionally large metadata may be returned as a bounded preview envelope. These
+context limits are separate from the Git tools' command-output limits. A failed
+patch read preserves collected status, while a failed status read simply omits
+automatic context. Non-Git directories, missing Git, configured filters, and
+inspection timeouts do not prevent normal agent questions.
+
 Enable local mutations with `CODEFORGE_GIT_ALLOW_MUTATIONS=true`. This adds:
 
 | Tool | Behavior |
