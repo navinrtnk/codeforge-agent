@@ -6,8 +6,8 @@ A local AI software engineering agent that helps you understand a codebase. It
 indexes source code, answers repository questions, inspects Git changes, and
 remembers conversations across runs.
 
-Built with Python, FastAPI, SQLite, and OpenAI or Anthropic models. Code editing
-and automated, test-verified fixes are planned; Git mutations are disabled by default.
+Built with Python, FastAPI, SQLite, and OpenAI or Anthropic models. It can apply
+validated text patches; automatic testing and verified fixes are planned.
 
 ## Run locally
 
@@ -67,5 +67,12 @@ curl -X POST http://127.0.0.1:8000/repositories/REPOSITORY_ID/runs \
 
 The response includes the answer in the assistant messages, run status, and tool
 history. Runs are saved in SQLite; conversation endpoints support follow-up questions.
+
+Runs default to `"mode":"read_only"`. To edit files, enable
+`CODEFORGE_CODE_WRITES_ENABLED=true` in `.env` and send `"mode":"write"` with the
+task (or conversation message). The agent can dry-run unified diffs with
+`validate_patch`, then use `apply_patch` for bounded edits with rollback on write
+failure. Limits: `CODEFORGE_PATCH_MAX_BYTES` and `CODEFORGE_PATCH_MAX_FILES`.
+Changes remain unverified until you run checks; reindex after editing to refresh search.
 
 Run lint, type checks, and tests with `make check`.

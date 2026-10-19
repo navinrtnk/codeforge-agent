@@ -31,6 +31,10 @@ class GitService:
         self.max_output_bytes = max_output_bytes
         self._locks: dict[Path, asyncio.Lock] = {}
 
+    def repository_lock(self, path: Path) -> asyncio.Lock:
+        """Serialize local Git mutations and patch transactions in this worker."""
+        return self._locks.setdefault(path.resolve(), asyncio.Lock())
+
     async def _command(
         self, repository: Path, *arguments: str, allowed_codes: tuple[int, ...] = (0,)
     ) -> tuple[int, str]:
@@ -276,7 +280,7 @@ class GitService:
 
     async def create_branch(self, path: Path, name: str) -> JsonObject:
         """Create a branch at HEAD without switching or overwriting an existing branch."""
-        async with self._locks.setdefault(path.resolve(), asyncio.Lock()):
+        async with self.repository_lock(path):
             repository = await self._prepare_mutation(path)
             await self._branch_name(repository, name)
             if await self._head(repository) is None:
@@ -286,7 +290,7 @@ class GitService:
 
     async def checkout(self, path: Path, name: str) -> JsonObject:
         """Switch to an existing local branch only when all files are clean."""
-        async with self._locks.setdefault(path.resolve(), asyncio.Lock()):
+        async with self.repository_lock(path):
             repository = await self._prepare_mutation(path)
             await self._branch_name(repository, name)
             if not (await self._status(repository))["clean"]:
@@ -297,14 +301,14 @@ class GitService:
 
     async def stage(self, path: Path, paths: list[str]) -> JsonObject:
         """Stage explicit files or tracked deletions with literal path matching."""
-        async with self._locks.setdefault(path.resolve(), asyncio.Lock()):
+        async with self.repository_lock(path):
             repository = await self._prepare_mutation(path)
             await self._command(repository, "add", "--", *await self._paths(repository, paths))
             return await self._status(repository)
 
     async def unstage(self, path: Path, paths: list[str]) -> JsonObject:
         """Remove explicit staged changes while preserving working files."""
-        async with self._locks.setdefault(path.resolve(), asyncio.Lock()):
+        async with self.repository_lock(path):
             repository = await self._prepare_mutation(path)
             selected = await self._paths(repository, paths)
             if await self._head(repository) is None:
@@ -317,7 +321,7 @@ class GitService:
         """Commit the reviewed index without hooks, signing, or amend."""
         if not message.strip() or len(message) > 500 or "\0" in message:
             raise GitError("Commit message must contain between 1 and 500 characters")
-        async with self._locks.setdefault(path.resolve(), asyncio.Lock()):
+        async with self.repository_lock(path):
             repository = await self._prepare_mutation(path)
             state = await self._status(repository)
             if state["detached"]:

@@ -61,6 +61,13 @@ class AgentRunStatus(enum.StrEnum):
     FAILED = "failed"
 
 
+class AgentRunMode(enum.StrEnum):
+    """Explicit authority selected by the caller for one run."""
+
+    READ_ONLY = "read_only"
+    WRITE = "write"
+
+
 class AgentMessageRole(enum.StrEnum):
     """Roles stored in an agent conversation."""
 
@@ -225,6 +232,11 @@ class AgentRun(Base):
         index=True,
     )
     task: Mapped[str] = mapped_column(Text)
+    mode: Mapped[AgentRunMode] = mapped_column(
+        Enum(AgentRunMode, native_enum=False),
+        default=AgentRunMode.READ_ONLY,
+        server_default="READ_ONLY",
+    )
     status: Mapped[AgentRunStatus] = mapped_column(
         Enum(AgentRunStatus, native_enum=False),
         default=AgentRunStatus.PENDING,

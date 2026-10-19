@@ -66,6 +66,8 @@ class GitTool:
         self.arguments_model = arguments_model
 
     async def execute(self, context: ToolContext, arguments: BaseModel) -> JsonObject:
+        if self.action not in {"status", "diff", "log", "branches"} and not context.allow_writes:
+            raise ToolExecutionError("This run is read-only")
         path = Path(context.repository.path)
         try:
             if self.action == "status":
@@ -103,7 +105,11 @@ class GitTool:
             raise ToolExecutionError(str(error)) from error
 
 
-def create_agent_tool_registry(service: GitService) -> ToolRegistry:
+def create_agent_tool_registry(
+    service: GitService,
+    *,
+    allow_mutations: bool | None = None,
+) -> ToolRegistry:
     """Combine file tools with Git inspection and optionally Git mutation tools."""
     registry = create_repository_tool_registry()
     definitions: list[tuple[GitAction, str, type[BaseModel]]] = [
@@ -116,7 +122,7 @@ def create_agent_tool_registry(service: GitService) -> ToolRegistry:
         ("log", "List recent Git commit IDs and subjects.", GitLogArguments),
         ("branches", "List local Git branches and the current checkout.", GitEmptyArguments),
     ]
-    if service.allow_mutations:
+    if service.allow_mutations and allow_mutations is not False:
         definitions.extend(
             [
                 (

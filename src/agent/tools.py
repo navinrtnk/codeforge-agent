@@ -35,6 +35,7 @@ class ToolContext:
     repository: Repository
     session: Session
     access: RepositoryAccess
+    allow_writes: bool = False
 
 
 class Tool(Protocol):

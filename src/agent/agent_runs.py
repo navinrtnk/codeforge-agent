@@ -12,8 +12,10 @@ from agent.database import get_database_session
 from agent.git_service import GitService
 from agent.git_tools import create_agent_tool_registry
 from agent.model_factory import create_model_client
-from agent.models import AgentRun, Repository
+from agent.models import AgentRun, AgentRunMode, Repository
 from agent.models_api import ModelClient, ModelConfigurationError
+from agent.patch_service import PatchService
+from agent.patch_tools import PatchTool
 from agent.repositories import RepositoryAccessDependency
 from agent.repository_access import RepositoryAccess
 from agent.schemas import AgentRunCreate, AgentRunResponse
@@ -51,7 +53,7 @@ async def create_agent_run(
 ) -> AgentRun:
     """Execute one bounded agent task against a registered repository."""
     repository = _get_repository(session, repository_id)
-    runner = build_agent_runner(request, access, model_client)
+    runner = build_agent_runner(request, access, model_client, mode=payload.mode)
     return await runner.run(session, repository, payload.task)
 
 
@@ -59,9 +61,15 @@ def build_agent_runner(
     request: Request,
     access: RepositoryAccess,
     model_client: ModelClient,
+    *,
+    mode: AgentRunMode = AgentRunMode.READ_ONLY,
 ) -> AgentRunner:
     """Build the same configured runner for standalone and conversation tasks."""
     settings = request.app.state.settings
+    if mode is AgentRunMode.WRITE and not settings.code_writes_enabled:
+        raise HTTPException(
+            status_code=403, detail="Enable CODEFORGE_CODE_WRITES_ENABLED for write runs"
+        )
     git_service: GitService | None = request.app.state.git_service
     if git_service is None:
         git_service = GitService(
@@ -71,9 +79,20 @@ def build_agent_runner(
             max_output_bytes=settings.git_max_output_bytes,
         )
         request.app.state.git_service = git_service
+    registry = create_agent_tool_registry(git_service, allow_mutations=mode is AgentRunMode.WRITE)
+    patch_service = PatchService(
+        access,
+        git_service,
+        allow_writes=settings.code_writes_enabled,
+        max_patch_bytes=settings.patch_max_bytes,
+        max_files=settings.patch_max_files,
+    )
+    registry.register(PatchTool(patch_service, dry_run=True))
+    if mode is AgentRunMode.WRITE:
+        registry.register(PatchTool(patch_service, dry_run=False))
     return AgentRunner(
         model_client,
-        create_agent_tool_registry(git_service),
+        registry,
         access,
         max_iterations=settings.agent_max_iterations,
         max_output_tokens=settings.agent_max_output_tokens,
@@ -83,6 +102,7 @@ def build_agent_runner(
         git_context_max_bytes=settings.git_context_max_bytes,
         git_context_max_files=settings.git_context_max_files,
         git_context_timeout_seconds=settings.git_context_timeout_seconds,
+        mode=mode,
     )
 
 

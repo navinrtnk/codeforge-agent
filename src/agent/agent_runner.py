@@ -13,6 +13,7 @@ from agent.models import (
     AgentMessage,
     AgentMessageRole,
     AgentRun,
+    AgentRunMode,
     AgentRunStatus,
     ConversationTurn,
     Repository,
@@ -63,6 +64,7 @@ class AgentRunner:
         git_context_max_bytes: int = 16_000,
         git_context_max_files: int = 50,
         git_context_timeout_seconds: float = 5,
+        mode: AgentRunMode = AgentRunMode.READ_ONLY,
     ) -> None:
         if max_iterations < 1:
             raise ValueError("Maximum agent iterations must be positive")
@@ -76,6 +78,7 @@ class AgentRunner:
         self.max_iterations = max_iterations
         self.max_output_tokens = max_output_tokens
         self.timeout_seconds = timeout_seconds
+        self.mode = mode
         self.git_context = GitContextBuilder(
             git_service or GitService(access),
             max_bytes=git_context_max_bytes,
@@ -103,6 +106,7 @@ class AgentRunner:
         run = AgentRun(
             repository=repository,
             task=task,
+            mode=self.mode,
             status=AgentRunStatus.RUNNING,
             started_at=datetime.now(UTC),
         )
@@ -115,7 +119,14 @@ class AgentRunner:
         try:
             async with asyncio.timeout(self.timeout_seconds):
                 snapshot = await self.git_context.build(Path(repository.path))
-                system = Message.text("system", SYSTEM_PROMPT)
+                instructions = SYSTEM_PROMPT + f"\nRun mode: {self.mode.value}."
+                if self.mode is AgentRunMode.WRITE:
+                    instructions += (
+                        " Use validate_patch before apply_patch. Applied edits are unverified."
+                    )
+                else:
+                    instructions += " Do not modify files, branches, or the Git index."
+                system = Message.text("system", instructions)
                 user = Message.text("user", task)
                 current_content: tuple[MessageContent, ...] = user.content
                 if snapshot is not None:
@@ -154,7 +165,12 @@ class AgentRunner:
         next_message_sequence: int,
     ) -> None:
         tool_sequence = 1
-        context = ToolContext(repository=repository, session=session, access=self.access)
+        context = ToolContext(
+            repository=repository,
+            session=session,
+            access=self.access,
+            allow_writes=run.mode is AgentRunMode.WRITE,
+        )
 
         for _ in range(self.max_iterations):
             response = await self.model_client.complete(

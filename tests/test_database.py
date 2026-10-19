@@ -1,12 +1,13 @@
 """Tests for database model persistence."""
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from agent.database import Database
 from agent.models import (
     AgentMessage,
     AgentMessageRole,
     AgentRun,
+    AgentRunMode,
     AgentRunStatus,
     Conversation,
     ConversationTurn,
@@ -48,12 +49,35 @@ def test_models_and_relationships_are_persisted() -> None:
         assert stored_repository.runs == [run]
         assert stored_run is not None
         assert stored_run.status is AgentRunStatus.PENDING
+        assert stored_run.mode is AgentRunMode.READ_ONLY
         assert stored_run.tool_events == [event]
         assert stored_run.messages == [message]
         assert stored_event is not None
         assert stored_event.arguments == {"path": "src/example.py"}
         assert stored_event.is_error is False
 
+    database.dispose()
+
+
+def test_existing_database_receives_read_only_mode_without_losing_runs() -> None:
+    database = Database("sqlite://")
+    database.create_schema()
+    with database.session_factory() as session:
+        repository = Repository(name="Existing", path="/tmp/existing")
+        run = AgentRun(repository=repository, task="Existing task")
+        session.add(repository)
+        session.commit()
+        run_id = run.id
+    # Simulate the exact pre-Epic-11 schema.
+    with database.engine.begin() as connection:
+        connection.execute(text("ALTER TABLE agent_runs DROP COLUMN mode"))
+    database.create_schema()
+    database.create_schema()
+    with database.session_factory() as session:
+        saved = session.get(AgentRun, run_id)
+        assert saved is not None
+        assert saved.mode is AgentRunMode.READ_ONLY
+        assert saved.task == "Existing task"
     database.dispose()
 
 

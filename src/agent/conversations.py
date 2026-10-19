@@ -133,7 +133,7 @@ async def append_message(
             conversation,
             repository,
             payload.content,
-            build_agent_runner(request, access, model_client),
+            build_agent_runner(request, access, model_client, mode=payload.mode),
         )
     except ConversationBusyError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error

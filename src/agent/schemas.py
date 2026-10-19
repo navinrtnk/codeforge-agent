@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from agent.models import AgentMessageRole, AgentRunStatus
+from agent.models import AgentMessageRole, AgentRunMode, AgentRunStatus
 
 
 class RepositoryCreate(BaseModel):
@@ -76,6 +76,7 @@ class AgentRunCreate(BaseModel):
     """A task to execute against a registered repository."""
 
     task: str = Field(min_length=1, max_length=20_000)
+    mode: AgentRunMode = AgentRunMode.READ_ONLY
 
 
 class ConversationCreate(BaseModel):
@@ -88,6 +89,7 @@ class ConversationMessageCreate(BaseModel):
     """A follow-up task to append to a conversation."""
 
     content: str = Field(min_length=1, max_length=20_000)
+    mode: AgentRunMode = AgentRunMode.READ_ONLY
 
     @field_validator("content")
     @classmethod
@@ -160,6 +162,7 @@ class AgentRunResponse(BaseModel):
     id: uuid.UUID
     repository_id: uuid.UUID
     task: str
+    mode: AgentRunMode
     status: AgentRunStatus
     error_message: str | None
     created_at: datetime

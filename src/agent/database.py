@@ -3,7 +3,7 @@
 from collections.abc import Generator
 
 from fastapi import Request
-from sqlalchemy import Engine, create_engine, text
+from sqlalchemy import Engine, create_engine, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -30,6 +30,17 @@ class Database:
     def create_schema(self) -> None:
         """Create tables that do not already exist."""
         Base.metadata.create_all(self.engine)
+        # Additive upgrade for databases created before explicit run modes.
+        if "mode" not in {
+            column["name"] for column in inspect(self.engine).get_columns("agent_runs")
+        }:
+            with self.engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "ALTER TABLE agent_runs ADD COLUMN mode VARCHAR(16) "
+                        "NOT NULL DEFAULT 'READ_ONLY'"
+                    )
+                )
         if self.engine.dialect.name == "sqlite":
             with self.engine.begin() as connection:
                 connection.execute(
