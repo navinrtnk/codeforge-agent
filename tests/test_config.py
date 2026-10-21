@@ -33,6 +33,10 @@ def test_settings_have_development_defaults() -> None:
     assert settings.code_writes_enabled is False
     assert settings.patch_max_bytes == 100_000
     assert settings.patch_max_files == 10
+    assert settings.test_execution_enabled is False
+    assert settings.test_python_executable is None
+    assert settings.test_timeout_seconds == 60.0
+    assert settings.test_max_output_bytes == 20_000
     assert settings.model_provider == "openai"
 
 
@@ -59,6 +63,10 @@ def test_settings_load_environment_overrides(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setenv("CODEFORGE_CODE_WRITES_ENABLED", "true")
     monkeypatch.setenv("CODEFORGE_PATCH_MAX_BYTES", "4096")
     monkeypatch.setenv("CODEFORGE_PATCH_MAX_FILES", "3")
+    monkeypatch.setenv("CODEFORGE_TEST_EXECUTION_ENABLED", "true")
+    monkeypatch.setenv("CODEFORGE_TEST_PYTHON_EXECUTABLE", "/custom/python")
+    monkeypatch.setenv("CODEFORGE_TEST_TIMEOUT_SECONDS", "15")
+    monkeypatch.setenv("CODEFORGE_TEST_MAX_OUTPUT_BYTES", "1024")
 
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
 
@@ -83,6 +91,10 @@ def test_settings_load_environment_overrides(monkeypatch: pytest.MonkeyPatch) ->
     assert settings.code_writes_enabled is True
     assert settings.patch_max_bytes == 4096
     assert settings.patch_max_files == 3
+    assert settings.test_execution_enabled is True
+    assert settings.test_python_executable == Path("/custom/python")
+    assert settings.test_timeout_seconds == 15.0
+    assert settings.test_max_output_bytes == 1024
     assert settings.openai_api_key is not None
     assert settings.openai_api_key.get_secret_value() == "secret-value"
     assert "secret-value" not in repr(settings)

@@ -16,6 +16,8 @@ from agent.models import AgentRun, AgentRunMode, Repository
 from agent.models_api import ModelClient, ModelConfigurationError
 from agent.patch_service import PatchService
 from agent.patch_tools import PatchTool
+from agent.pytest_runner import PytestRunner
+from agent.pytest_tool import PytestTool
 from agent.repositories import RepositoryAccessDependency
 from agent.repository_access import RepositoryAccess
 from agent.schemas import AgentRunCreate, AgentRunResponse
@@ -90,6 +92,18 @@ def build_agent_runner(
     registry.register(PatchTool(patch_service, dry_run=True))
     if mode is AgentRunMode.WRITE:
         registry.register(PatchTool(patch_service, dry_run=False))
+        if settings.test_execution_enabled:
+            registry.register(
+                PytestTool(
+                    PytestRunner(
+                        access,
+                        enabled=True,
+                        python_executable=settings.test_python_executable,
+                        timeout_seconds=settings.test_timeout_seconds,
+                        max_output_bytes=settings.test_max_output_bytes,
+                    )
+                )
+            )
     return AgentRunner(
         model_client,
         registry,

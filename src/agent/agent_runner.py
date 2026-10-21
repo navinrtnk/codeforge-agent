@@ -123,6 +123,8 @@ class AgentRunner:
                 if self.mode is AgentRunMode.WRITE:
                     instructions += (
                         " Use validate_patch before apply_patch. Applied edits are unverified."
+                        " If run_pytest is available, use its evidence to report test outcomes. "
+                        "Timeouts, empty suites, and skipped-only suites do not verify edits."
                     )
                 else:
                     instructions += " Do not modify files, branches, or the Git index."

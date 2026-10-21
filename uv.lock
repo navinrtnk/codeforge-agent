@@ -80,6 +80,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "openai" },
     { name = "pydantic-settings" },
+    { name = "pytest" },
     { name = "sqlalchemy" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -88,7 +89,6 @@ dependencies = [
 dev = [
     { name = "httpx2" },
     { name = "mypy" },
-    { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
 ]
@@ -99,6 +99,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.116,<1" },
     { name = "openai", specifier = ">=2,<3" },
     { name = "pydantic-settings", specifier = ">=2.10,<3" },
+    { name = "pytest", specifier = ">=8.4,<9" },
     { name = "sqlalchemy", specifier = ">=2.0,<3" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.35,<1" },
 ]
@@ -107,7 +108,6 @@ requires-dist = [
 dev = [
     { name = "httpx2", specifier = ">=2,<3" },
     { name = "mypy", specifier = ">=1.17,<2" },
-    { name = "pytest", specifier = ">=8.4,<9" },
     { name = "pytest-cov", specifier = ">=6.2,<8" },
     { name = "ruff", specifier = ">=0.12,<1" },
 ]

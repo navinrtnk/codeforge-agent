@@ -3,7 +3,7 @@
 import json
 import re
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from time import perf_counter
 from typing import Any, Protocol
 
@@ -36,6 +36,8 @@ class ToolContext:
     session: Session
     access: RepositoryAccess
     allow_writes: bool = False
+    agent_run_id: uuid.UUID | None = None
+    tool_call_id: str | None = None
 
 
 class Tool(Protocol):
@@ -121,7 +123,10 @@ class ToolExecutor:
         else:
             try:
                 arguments = tool.arguments_model.model_validate(call.arguments)
-                result = await tool.execute(context, arguments)
+                result = await tool.execute(
+                    replace(context, agent_run_id=agent_run_id, tool_call_id=call.id),
+                    arguments,
+                )
             except ValidationError as error:
                 is_error = True
                 result = {"error": _validation_message(error)}

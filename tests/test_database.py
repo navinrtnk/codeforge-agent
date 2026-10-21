@@ -11,6 +11,7 @@ from agent.models import (
     AgentRunStatus,
     Conversation,
     ConversationTurn,
+    PytestExecution,
     Repository,
     ToolEvent,
 )
@@ -90,6 +91,26 @@ def test_deleting_repository_cascades_to_agent_activity() -> None:
         run = AgentRun(repository=repository, task="Review the change")
         conversation = Conversation(repository=repository, title="Review discussion")
         conversation.turns.append(ConversationTurn(run=run, sequence_number=1))
+        run.test_results.append(
+            PytestExecution(
+                tool_call_id="test-call",
+                command=["python", "-m", "pytest"],
+                targets=[],
+                config_file=None,
+                status="passed",
+                counts={"passed": 1},
+                summary_complete=True,
+                verified=True,
+                exit_code=0,
+                stdout="1 passed in 0.01s",
+                stderr="",
+                timed_out=False,
+                stdout_truncated=False,
+                stderr_truncated=False,
+                error_message=None,
+                duration_ms=10,
+            )
+        )
         run.tool_events.append(
             ToolEvent(
                 sequence_number=1,
@@ -116,5 +137,6 @@ def test_deleting_repository_cascades_to_agent_activity() -> None:
         assert session.scalar(select(AgentMessage)) is None
         assert session.scalar(select(Conversation)) is None
         assert session.scalar(select(ConversationTurn)) is None
+        assert session.scalar(select(PytestExecution)) is None
 
     database.dispose()

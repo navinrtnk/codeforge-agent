@@ -257,6 +257,42 @@ class AgentRun(Base):
         cascade="all, delete-orphan",
         order_by="AgentMessage.sequence_number",
     )
+    test_results: Mapped[list[PytestExecution]] = relationship(
+        back_populates="run",
+        cascade="all, delete-orphan",
+        order_by="(PytestExecution.created_at, PytestExecution.id)",
+    )
+
+
+class PytestExecution(Base):
+    """One bounded, sanitized pytest result associated with an agent run."""
+
+    __tablename__ = "pytest_executions"
+
+    id: Mapped[uuid.UUID] = mapped_column(SqlUuid, primary_key=True, default=uuid.uuid4)
+    agent_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="CASCADE"),
+        index=True,
+    )
+    tool_call_id: Mapped[str] = mapped_column(String(255))
+    command: Mapped[list[str]] = mapped_column(JSON)
+    targets: Mapped[list[str]] = mapped_column(JSON)
+    config_file: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(32))
+    counts: Mapped[dict[str, int]] = mapped_column(JSON)
+    summary_complete: Mapped[bool] = mapped_column(Boolean)
+    verified: Mapped[bool] = mapped_column(Boolean)
+    exit_code: Mapped[int | None] = mapped_column(Integer)
+    stdout: Mapped[str] = mapped_column(Text)
+    stderr: Mapped[str] = mapped_column(Text)
+    timed_out: Mapped[bool] = mapped_column(Boolean)
+    stdout_truncated: Mapped[bool] = mapped_column(Boolean)
+    stderr_truncated: Mapped[bool] = mapped_column(Boolean)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    duration_ms: Mapped[float] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utc_now)
+
+    run: Mapped[AgentRun] = relationship(back_populates="test_results")
 
 
 class AgentMessage(Base):

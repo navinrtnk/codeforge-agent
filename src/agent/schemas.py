@@ -154,6 +154,31 @@ class ToolEventResponse(BaseModel):
     created_at: datetime
 
 
+class PytestExecutionResponse(BaseModel):
+    """Structured test evidence, independent of truncated conversational tool output."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    tool_call_id: str
+    command: list[str]
+    targets: list[str]
+    config_file: str | None
+    status: str
+    counts: dict[str, int]
+    summary_complete: bool
+    verified: bool
+    exit_code: int | None
+    stdout: str
+    stderr: str
+    timed_out: bool
+    stdout_truncated: bool
+    stderr_truncated: bool
+    error_message: str | None
+    duration_ms: float
+    created_at: datetime
+
+
 class AgentRunResponse(BaseModel):
     """Public representation of an agent run and its conversation."""
 
@@ -170,3 +195,4 @@ class AgentRunResponse(BaseModel):
     completed_at: datetime | None
     messages: list[AgentMessageResponse]
     tool_events: list[ToolEventResponse]
+    test_results: list[PytestExecutionResponse]

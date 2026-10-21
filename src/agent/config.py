@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     code_writes_enabled: bool = False
     patch_max_bytes: int = Field(default=100_000, ge=1)
     patch_max_files: int = Field(default=10, ge=1, le=100)
+    test_execution_enabled: bool = False
+    test_python_executable: Path | None = None
+    test_timeout_seconds: float = Field(default=60.0, gt=0)
+    test_max_output_bytes: int = Field(default=20_000, ge=256)
     model_provider: Literal["openai", "anthropic"] = "openai"
     model_name: str | None = None
     openai_api_key: SecretStr | None = None

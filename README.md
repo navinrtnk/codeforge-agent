@@ -7,7 +7,7 @@ indexes source code, answers repository questions, inspects Git changes, and
 remembers conversations across runs.
 
 Built with Python, FastAPI, SQLite, and OpenAI or Anthropic models. It can apply
-validated text patches; automatic testing and verified fixes are planned.
+validated text patches and run pytest; automatic repair loops are planned.
 
 ## Run locally
 
@@ -73,6 +73,13 @@ Runs default to `"mode":"read_only"`. To edit files, enable
 task (or conversation message). The agent can dry-run unified diffs with
 `validate_patch`, then use `apply_patch` for bounded edits with rollback on write
 failure. Limits: `CODEFORGE_PATCH_MAX_BYTES` and `CODEFORGE_PATCH_MAX_FILES`.
-Changes remain unverified until you run checks; reindex after editing to refresh search.
+Reindex after editing to refresh search.
+
+Enable `CODEFORGE_TEST_EXECUTION_ENABLED=true` to expose `run_pytest` in write-mode
+runs. Ask for all tests or specific paths, such as `tests/test_api.py`; results
+are saved under `test_results`. Tests execute trusted repository code locally.
+`CODEFORGE_TEST_TIMEOUT_SECONDS` and `CODEFORGE_TEST_MAX_OUTPUT_BYTES` bound execution;
+set `CODEFORGE_TEST_PYTHON_EXECUTABLE` to a project interpreter with its dependencies
+installed, or leave it unset to use the service's Python. Docker isolation comes later.
 
 Run lint, type checks, and tests with `make check`.
