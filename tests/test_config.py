@@ -37,6 +37,11 @@ def test_settings_have_development_defaults() -> None:
     assert settings.test_python_executable is None
     assert settings.test_timeout_seconds == 60.0
     assert settings.test_max_output_bytes == 20_000
+    assert settings.analysis_execution_enabled is False
+    assert settings.analysis_python_executable is None
+    assert settings.analysis_timeout_seconds == 60.0
+    assert settings.analysis_max_output_bytes == 20_000
+    assert settings.analysis_max_diagnostics == 200
     assert settings.model_provider == "openai"
 
 
@@ -67,6 +72,11 @@ def test_settings_load_environment_overrides(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setenv("CODEFORGE_TEST_PYTHON_EXECUTABLE", "/custom/python")
     monkeypatch.setenv("CODEFORGE_TEST_TIMEOUT_SECONDS", "15")
     monkeypatch.setenv("CODEFORGE_TEST_MAX_OUTPUT_BYTES", "1024")
+    monkeypatch.setenv("CODEFORGE_ANALYSIS_EXECUTION_ENABLED", "true")
+    monkeypatch.setenv("CODEFORGE_ANALYSIS_PYTHON_EXECUTABLE", "/custom/analysis/python")
+    monkeypatch.setenv("CODEFORGE_ANALYSIS_TIMEOUT_SECONDS", "10")
+    monkeypatch.setenv("CODEFORGE_ANALYSIS_MAX_OUTPUT_BYTES", "1024")
+    monkeypatch.setenv("CODEFORGE_ANALYSIS_MAX_DIAGNOSTICS", "50")
 
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
 
@@ -95,6 +105,11 @@ def test_settings_load_environment_overrides(monkeypatch: pytest.MonkeyPatch) ->
     assert settings.test_python_executable == Path("/custom/python")
     assert settings.test_timeout_seconds == 15.0
     assert settings.test_max_output_bytes == 1024
+    assert settings.analysis_execution_enabled is True
+    assert settings.analysis_python_executable == Path("/custom/analysis/python")
+    assert settings.analysis_timeout_seconds == 10.0
+    assert settings.analysis_max_output_bytes == 1024
+    assert settings.analysis_max_diagnostics == 50
     assert settings.openai_api_key is not None
     assert settings.openai_api_key.get_secret_value() == "secret-value"
     assert "secret-value" not in repr(settings)
@@ -106,3 +121,22 @@ def test_settings_reject_unknown_environment() -> None:
             environment="staging",  # type: ignore[arg-type]
             _env_file=None,
         )
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("CODEFORGE_ANALYSIS_TIMEOUT_SECONDS", "0"),
+        ("CODEFORGE_ANALYSIS_MAX_OUTPUT_BYTES", "255"),
+        ("CODEFORGE_ANALYSIS_MAX_DIAGNOSTICS", "0"),
+        ("CODEFORGE_ANALYSIS_MAX_DIAGNOSTICS", "1001"),
+    ],
+)
+def test_analysis_limits_are_positive_and_bounded(
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    value: str,
+) -> None:
+    monkeypatch.setenv(name, value)
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)  # type: ignore[call-arg]

@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     test_python_executable: Path | None = None
     test_timeout_seconds: float = Field(default=60.0, gt=0)
     test_max_output_bytes: int = Field(default=20_000, ge=256)
+    analysis_execution_enabled: bool = False
+    analysis_python_executable: Path | None = None
+    analysis_timeout_seconds: float = Field(default=60.0, gt=0)
+    analysis_max_output_bytes: int = Field(default=20_000, ge=256)
+    analysis_max_diagnostics: int = Field(default=200, ge=1, le=1000)
     model_provider: Literal["openai", "anthropic"] = "openai"
     model_name: str | None = None
     openai_api_key: SecretStr | None = None

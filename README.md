@@ -7,7 +7,7 @@ indexes source code, answers repository questions, inspects Git changes, and
 remembers conversations across runs.
 
 Built with Python, FastAPI, SQLite, and OpenAI or Anthropic models. It can apply
-validated text patches and run pytest; automatic repair loops are planned.
+validated text patches, run pytest, and check code with Ruff/mypy; automatic repair loops are planned.
 
 ## Run locally
 
@@ -81,5 +81,11 @@ are saved under `test_results`. Tests execute trusted repository code locally.
 `CODEFORGE_TEST_TIMEOUT_SECONDS` and `CODEFORGE_TEST_MAX_OUTPUT_BYTES` bound execution;
 set `CODEFORGE_TEST_PYTHON_EXECUTABLE` to a project interpreter with its dependencies
 installed, or leave it unset to use the service's Python. Docker isolation comes later.
+
+Enable `CODEFORGE_ANALYSIS_EXECUTION_ENABLED=true` for `run_ruff` and `run_mypy` in
+trusted write-mode runs. Root project configuration is detected automatically
+(Ruff `extend` is unsupported); diagnostics are saved under `analysis_results`.
+Optional `CODEFORGE_ANALYSIS_PYTHON_EXECUTABLE` selects an interpreter with both tools installed.
+Timeout, output, and diagnostic limits are configurable in `.env.example`.
 
 Run lint, type checks, and tests with `make check`.

@@ -125,6 +125,9 @@ class AgentRunner:
                         " Use validate_patch before apply_patch. Applied edits are unverified."
                         " If run_pytest is available, use its evidence to report test outcomes. "
                         "Timeouts, empty suites, and skipped-only suites do not verify edits."
+                        " Use run_ruff and run_mypy when available for static diagnostics."
+                        " Static analysis success is not test verification; report incomplete"
+                        " or truncated checks explicitly."
                     )
                 else:
                     instructions += " Do not modify files, branches, or the Git index."

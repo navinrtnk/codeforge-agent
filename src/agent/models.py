@@ -262,6 +262,28 @@ class AgentRun(Base):
         cascade="all, delete-orphan",
         order_by="(PytestExecution.created_at, PytestExecution.id)",
     )
+    analysis_results: Mapped[list[AnalysisExecution]] = relationship(
+        back_populates="run",
+        cascade="all, delete-orphan",
+        order_by="(AnalysisExecution.created_at, AnalysisExecution.id)",
+    )
+
+
+class AnalysisExecution(Base):
+    """Bounded, sanitized static diagnostics independent of conversational truncation."""
+
+    __tablename__ = "analysis_executions"
+
+    id: Mapped[uuid.UUID] = mapped_column(SqlUuid, primary_key=True, default=uuid.uuid4)
+    agent_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="CASCADE"), index=True
+    )
+    tool_call_id: Mapped[str] = mapped_column(String(255))
+    tool_name: Mapped[str] = mapped_column(String(32))
+    result: Mapped[dict[str, Any]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utc_now)
+
+    run: Mapped[AgentRun] = relationship(back_populates="analysis_results")
 
 
 class PytestExecution(Base):

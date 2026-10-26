@@ -179,6 +179,18 @@ class PytestExecutionResponse(BaseModel):
     created_at: datetime
 
 
+class AnalysisExecutionResponse(BaseModel):
+    """Persisted structured static analysis evidence."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    tool_call_id: str
+    tool_name: str
+    result: dict[str, Any]
+    created_at: datetime
+
+
 class AgentRunResponse(BaseModel):
     """Public representation of an agent run and its conversation."""
 
@@ -196,3 +208,4 @@ class AgentRunResponse(BaseModel):
     messages: list[AgentMessageResponse]
     tool_events: list[ToolEventResponse]
     test_results: list[PytestExecutionResponse]
+    analysis_results: list[AnalysisExecutionResponse]

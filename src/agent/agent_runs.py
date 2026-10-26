@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from agent.agent_runner import AgentRunner
+from agent.analysis_tools import StaticAnalysisTool
 from agent.database import get_database_session
 from agent.git_service import GitService
 from agent.git_tools import create_agent_tool_registry
@@ -21,6 +22,7 @@ from agent.pytest_tool import PytestTool
 from agent.repositories import RepositoryAccessDependency
 from agent.repository_access import RepositoryAccess
 from agent.schemas import AgentRunCreate, AgentRunResponse
+from agent.static_analysis import StaticAnalysisRunner
 
 router = APIRouter(prefix="/repositories/{repository_id}/runs", tags=["agent runs"])
 SessionDependency = Annotated[Session, Depends(get_database_session)]
@@ -92,6 +94,17 @@ def build_agent_runner(
     registry.register(PatchTool(patch_service, dry_run=True))
     if mode is AgentRunMode.WRITE:
         registry.register(PatchTool(patch_service, dry_run=False))
+        if settings.analysis_execution_enabled:
+            analysis_runner = StaticAnalysisRunner(
+                access,
+                enabled=True,
+                python_executable=settings.analysis_python_executable,
+                timeout_seconds=settings.analysis_timeout_seconds,
+                max_output_bytes=settings.analysis_max_output_bytes,
+                max_diagnostics=settings.analysis_max_diagnostics,
+            )
+            registry.register(StaticAnalysisTool(analysis_runner, "ruff"))
+            registry.register(StaticAnalysisTool(analysis_runner, "mypy"))
         if settings.test_execution_enabled:
             registry.register(
                 PytestTool(

@@ -78,9 +78,11 @@ source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "fastapi" },
+    { name = "mypy" },
     { name = "openai" },
     { name = "pydantic-settings" },
     { name = "pytest" },
+    { name = "ruff" },
     { name = "sqlalchemy" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -88,18 +90,18 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "httpx2" },
-    { name = "mypy" },
     { name = "pytest-cov" },
-    { name = "ruff" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=1,<2" },
     { name = "fastapi", specifier = ">=0.116,<1" },
+    { name = "mypy", specifier = ">=1.17,<2" },
     { name = "openai", specifier = ">=2,<3" },
     { name = "pydantic-settings", specifier = ">=2.10,<3" },
     { name = "pytest", specifier = ">=8.4,<9" },
+    { name = "ruff", specifier = ">=0.12,<1" },
     { name = "sqlalchemy", specifier = ">=2.0,<3" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.35,<1" },
 ]
@@ -107,9 +109,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "httpx2", specifier = ">=2,<3" },
-    { name = "mypy", specifier = ">=1.17,<2" },
     { name = "pytest-cov", specifier = ">=6.2,<8" },
-    { name = "ruff", specifier = ">=0.12,<1" },
 ]
 
 [[package]]
