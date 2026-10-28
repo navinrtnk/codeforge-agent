@@ -41,6 +41,18 @@ class Database:
                         "NOT NULL DEFAULT 'READ_ONLY'"
                     )
                 )
+        columns = {column["name"] for column in inspect(self.engine).get_columns("agent_runs")}
+        upgrades = {
+            "run_type": "VARCHAR(16) NOT NULL DEFAULT 'TASK'",
+            "repair_attempts": "INTEGER NOT NULL DEFAULT 0",
+            "verified": "BOOLEAN NOT NULL DEFAULT FALSE",
+        }
+        with self.engine.begin() as connection:
+            for name, definition in upgrades.items():
+                if name not in columns:
+                    connection.execute(
+                        text(f"ALTER TABLE agent_runs ADD COLUMN {name} {definition}")
+                    )
         if self.engine.dialect.name == "sqlite":
             with self.engine.begin() as connection:
                 connection.execute(

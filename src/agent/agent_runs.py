@@ -13,7 +13,7 @@ from agent.database import get_database_session
 from agent.git_service import GitService
 from agent.git_tools import create_agent_tool_registry
 from agent.model_factory import create_model_client
-from agent.models import AgentRun, AgentRunMode, Repository
+from agent.models import AgentRun, AgentRunMode, AgentRunType, Repository
 from agent.models_api import ModelClient, ModelConfigurationError
 from agent.patch_service import PatchService
 from agent.patch_tools import PatchTool
@@ -21,7 +21,7 @@ from agent.pytest_runner import PytestRunner
 from agent.pytest_tool import PytestTool
 from agent.repositories import RepositoryAccessDependency
 from agent.repository_access import RepositoryAccess
-from agent.schemas import AgentRunCreate, AgentRunResponse
+from agent.schemas import AgentRunCreate, AgentRunResponse, AgentTaskCreate
 from agent.static_analysis import StaticAnalysisRunner
 
 router = APIRouter(prefix="/repositories/{repository_id}/runs", tags=["agent runs"])
@@ -61,15 +61,37 @@ async def create_agent_run(
     return await runner.run(session, repository, payload.task)
 
 
+@router.post("/bug-fix", response_model=AgentRunResponse, status_code=status.HTTP_201_CREATED)
+async def create_bug_fix_run(
+    repository_id: uuid.UUID,
+    payload: AgentTaskCreate,
+    request: Request,
+    session: SessionDependency,
+    access: RepositoryAccessDependency,
+    model_client: ModelClientDependency,
+) -> AgentRun:
+    """Investigate and repair a bug with enforced, bounded test verification."""
+    repository = _get_repository(session, repository_id)
+    runner = build_agent_runner(
+        request, access, model_client, mode=AgentRunMode.WRITE, run_type=AgentRunType.BUG_FIX
+    )
+    return await runner.run(session, repository, payload.task)
+
+
 def build_agent_runner(
     request: Request,
     access: RepositoryAccess,
     model_client: ModelClient,
     *,
     mode: AgentRunMode = AgentRunMode.READ_ONLY,
+    run_type: AgentRunType = AgentRunType.TASK,
 ) -> AgentRunner:
     """Build the same configured runner for standalone and conversation tasks."""
     settings = request.app.state.settings
+    if run_type is AgentRunType.BUG_FIX and not settings.test_execution_enabled:
+        raise HTTPException(
+            status_code=403, detail="Enable CODEFORGE_TEST_EXECUTION_ENABLED for bug-fix runs"
+        )
     if mode is AgentRunMode.WRITE and not settings.code_writes_enabled:
         raise HTTPException(
             status_code=403, detail="Enable CODEFORGE_CODE_WRITES_ENABLED for write runs"
@@ -130,6 +152,8 @@ def build_agent_runner(
         git_context_max_files=settings.git_context_max_files,
         git_context_timeout_seconds=settings.git_context_timeout_seconds,
         mode=mode,
+        run_type=run_type,
+        max_repair_attempts=settings.bug_fix_max_attempts,
     )
 
 

@@ -1,6 +1,8 @@
 """Run real pytest projects and distinguish verification from incomplete execution."""
 
 import asyncio
+import os
+import py_compile
 from pathlib import Path
 
 import pytest
@@ -53,6 +55,24 @@ def test_configured_suite_and_targeted_paths(tmp_path: Path) -> None:
     assert targeted.status == "failed" and targeted.verified is False
     assert targeted.counts["failed"] == 1
     assert targeted.targets == ("other/test_fail.py",)
+
+
+@pytest.mark.parametrize(("before", "after", "verified"), [(0, 1, True), (1, 0, False)])
+def test_verification_ignores_stale_bytecode_after_same_size_edits(
+    tmp_path: Path, before: int, after: int, verified: bool
+) -> None:
+    source = tmp_path / "app.py"
+    source.write_text(f"value = {before}\n", encoding="utf-8", newline="\n")
+    timestamp = source.stat().st_mtime
+    py_compile.compile(str(source), doraise=True)
+    source.write_text(f"value = {after}\n", encoding="utf-8", newline="\n")
+    os.utime(source, (timestamp, timestamp))
+    (tmp_path / "test_app.py").write_text(
+        "from app import value\ndef test_value():\n    assert value == 1\n", encoding="utf-8"
+    )
+    result = asyncio.run(runner(tmp_path).run(tmp_path, []))
+    assert result.verified is verified
+    assert result.status == ("passed" if verified else "failed")
 
 
 @pytest.mark.parametrize(

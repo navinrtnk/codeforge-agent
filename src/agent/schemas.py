@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from agent.models import AgentMessageRole, AgentRunMode, AgentRunStatus
+from agent.models import AgentMessageRole, AgentRunMode, AgentRunStatus, AgentRunType
 
 
 class RepositoryCreate(BaseModel):
@@ -72,10 +72,22 @@ class SymbolSearchResultResponse(BaseModel):
     end_line: int
 
 
-class AgentRunCreate(BaseModel):
-    """A task to execute against a registered repository."""
+class AgentTaskCreate(BaseModel):
+    """A nonblank repository task."""
 
     task: str = Field(min_length=1, max_length=20_000)
+
+    @field_validator("task")
+    @classmethod
+    def reject_blank_task(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Agent task must not be blank")
+        return value
+
+
+class AgentRunCreate(AgentTaskCreate):
+    """A task to execute against a registered repository."""
+
     mode: AgentRunMode = AgentRunMode.READ_ONLY
 
 
@@ -200,6 +212,9 @@ class AgentRunResponse(BaseModel):
     repository_id: uuid.UUID
     task: str
     mode: AgentRunMode
+    run_type: AgentRunType
+    repair_attempts: int
+    verified: bool
     status: AgentRunStatus
     error_message: str | None
     created_at: datetime

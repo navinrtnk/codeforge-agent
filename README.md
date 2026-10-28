@@ -7,7 +7,7 @@ indexes source code, answers repository questions, inspects Git changes, and
 remembers conversations across runs.
 
 Built with Python, FastAPI, SQLite, and OpenAI or Anthropic models. It can apply
-validated text patches, run pytest, and check code with Ruff/mypy; automatic repair loops are planned.
+validated text patches, run pytest, check code with Ruff/mypy, and retry bug fixes until verified.
 
 ## Run locally
 
@@ -81,6 +81,13 @@ are saved under `test_results`. Tests execute trusted repository code locally.
 `CODEFORGE_TEST_TIMEOUT_SECONDS` and `CODEFORGE_TEST_MAX_OUTPUT_BYTES` bound execution;
 set `CODEFORGE_TEST_PYTHON_EXECUTABLE` to a project interpreter with its dependencies
 installed, or leave it unset to use the service's Python. Docker isolation comes later.
+
+With writes and test execution enabled, `POST /repositories/REPOSITORY_ID/runs/bug-fix`
+with `{"task":"Fix the bug"}` investigates and patches, then automatically runs the full
+pytest suite after each patch batch. Failed checks feed another repair attempt, bounded
+by `CODEFORGE_BUG_FIX_MAX_ATTEMPTS` (default 3), agent iterations, and the run timeout.
+Responses include `run_type`, `repair_attempts`, and `verified`; unsuccessful repairs
+are explicitly unverified and leave applied edits available for inspection.
 
 Enable `CODEFORGE_ANALYSIS_EXECUTION_ENABLED=true` for `run_ruff` and `run_mypy` in
 trusted write-mode runs. Root project configuration is detected automatically

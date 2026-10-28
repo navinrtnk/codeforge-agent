@@ -4,6 +4,7 @@ import configparser
 import os
 import re
 import sys
+import tempfile
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -154,13 +155,17 @@ class PytestRunner:
                 *targets,
             ]
         )
-        process = await self.process_runner.run(
-            tuple(arguments),
-            cwd=repository,
-            environment=environment,
-            timeout_seconds=self.timeout_seconds,
-            max_output_bytes=self.max_output_bytes,
-        )
+        # Same-size edits within one timestamp tick can reuse stale .pyc files.
+        # An empty cache prefix forces fresh source imports without altering repo caches.
+        with tempfile.TemporaryDirectory(prefix="codeforge-pycache-") as cache:
+            environment.update(PYTHONPYCACHEPREFIX=cache, PYTHONDONTWRITEBYTECODE="1")
+            process = await self.process_runner.run(
+                tuple(arguments),
+                cwd=repository,
+                environment=environment,
+                timeout_seconds=self.timeout_seconds,
+                max_output_bytes=self.max_output_bytes,
+            )
         counts, complete = parse_summary(process.stdout)
         status = {
             0: "passed",

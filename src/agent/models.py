@@ -68,6 +68,13 @@ class AgentRunMode(enum.StrEnum):
     WRITE = "write"
 
 
+class AgentRunType(enum.StrEnum):
+    """Workflow enforced independently of the model's instructions."""
+
+    TASK = "task"
+    BUG_FIX = "bug_fix"
+
+
 class AgentMessageRole(enum.StrEnum):
     """Roles stored in an agent conversation."""
 
@@ -232,6 +239,11 @@ class AgentRun(Base):
         index=True,
     )
     task: Mapped[str] = mapped_column(Text)
+    run_type: Mapped[AgentRunType] = mapped_column(
+        Enum(AgentRunType, native_enum=False), default=AgentRunType.TASK, server_default="TASK"
+    )
+    repair_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     mode: Mapped[AgentRunMode] = mapped_column(
         Enum(AgentRunMode, native_enum=False),
         default=AgentRunMode.READ_ONLY,

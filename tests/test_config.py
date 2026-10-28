@@ -19,6 +19,7 @@ def test_settings_have_development_defaults() -> None:
     assert settings.index_chunk_size_lines == 200
     assert settings.max_tool_output_bytes == 100_000
     assert settings.agent_max_iterations == 8
+    assert settings.bug_fix_max_attempts == 3
     assert settings.agent_max_output_tokens == 4096
     assert settings.agent_timeout_seconds == 120.0
     assert settings.conversation_history_token_budget == 8192
@@ -130,6 +131,8 @@ def test_settings_reject_unknown_environment() -> None:
         ("CODEFORGE_ANALYSIS_MAX_OUTPUT_BYTES", "255"),
         ("CODEFORGE_ANALYSIS_MAX_DIAGNOSTICS", "0"),
         ("CODEFORGE_ANALYSIS_MAX_DIAGNOSTICS", "1001"),
+        ("CODEFORGE_BUG_FIX_MAX_ATTEMPTS", "0"),
+        ("CODEFORGE_BUG_FIX_MAX_ATTEMPTS", "21"),
     ],
 )
 def test_analysis_limits_are_positive_and_bounded(

@@ -9,6 +9,7 @@ from agent.models import (
     AgentRun,
     AgentRunMode,
     AgentRunStatus,
+    AgentRunType,
     Conversation,
     ConversationTurn,
     PytestExecution,
@@ -139,4 +140,25 @@ def test_deleting_repository_cascades_to_agent_activity() -> None:
         assert session.scalar(select(ConversationTurn)) is None
         assert session.scalar(select(PytestExecution)) is None
 
+    database.dispose()
+
+
+def test_existing_runs_receive_repair_defaults_without_data_loss() -> None:
+    database = Database("sqlite://")
+    database.create_schema()
+    with database.session_factory() as session:
+        run = AgentRun(repository=Repository(name="Existing", path="/existing"), task="Inspect")
+        session.add(run)
+        session.commit()
+        run_id = run.id
+    with database.engine.begin() as connection:
+        for name in ("run_type", "repair_attempts", "verified"):
+            connection.execute(text(f"ALTER TABLE agent_runs DROP COLUMN {name}"))
+    database.create_schema()
+    database.create_schema()
+    with database.session_factory() as session:
+        saved = session.get(AgentRun, run_id)
+        assert saved is not None and saved.task == "Inspect"
+        assert saved.run_type is AgentRunType.TASK
+        assert saved.repair_attempts == 0 and saved.verified is False
     database.dispose()

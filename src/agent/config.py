@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     index_chunk_size_lines: int = Field(default=200, gt=0)
     max_tool_output_bytes: int = Field(default=100_000, ge=256)
     agent_max_iterations: int = Field(default=8, ge=1, le=100)
+    bug_fix_max_attempts: int = Field(default=3, ge=1, le=20)
     agent_max_output_tokens: int = Field(default=4096, ge=1)
     agent_timeout_seconds: float = Field(default=120.0, gt=0)
     conversation_history_token_budget: int = Field(default=8192, ge=256)
