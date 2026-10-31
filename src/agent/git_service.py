@@ -198,6 +198,61 @@ class GitService:
             "detached": state["detached"],
         }
 
+    async def review_diff(
+        self,
+        path: Path,
+        *,
+        staged: bool = False,
+        base_ref: str | None = None,
+        max_files: int = 50,
+        max_bytes: int = 100_000,
+    ) -> dict[str, str]:
+        """Collect per-file patches and nearby code without relying on quoted diff paths."""
+        if max_files < 1 or max_bytes < 1 or (staged and base_ref is not None):
+            raise GitError("Invalid review selection or limits")
+        async with self.repository_lock(path):
+            repository = await self._repository(path)
+            revisions: list[str] = []
+            if base_ref is not None:
+                if not base_ref or base_ref.startswith("-") or "\0" in base_ref:
+                    raise GitError("Invalid review base ref")
+                _, base = await self._command(
+                    repository, "rev-parse", "--verify", "--end-of-options", base_ref + "^{commit}"
+                )
+                head = await self._head(repository)
+                if head is None:
+                    raise GitError("Branch review requires an initial commit")
+                _, ancestor = await self._command(repository, "merge-base", base.strip(), head)
+                revisions = [ancestor.strip(), head]
+            elif staged:
+                revisions = ["--cached"]
+            arguments = [
+                "diff",
+                "--no-ext-diff",
+                "--no-textconv",
+                "--no-color",
+                "--no-renames",
+                "--ignore-submodules=all",
+                "--no-relative",
+            ]
+            _, names = await self._command(
+                repository, *arguments, "--name-only", "-z", *revisions, "--"
+            )
+            files = names.removesuffix("\0").split("\0") if names else []
+            if len(files) > max_files:
+                raise GitError("Review exceeds the configured file limit")
+            patches: dict[str, str] = {}
+            size = 0
+            for file in files:
+                _, patch = await self._command(
+                    repository, *arguments, "--patch", "--unified=5", *revisions, "--", file
+                )
+                size += len(file.encode("utf-8")) + len(patch.encode("utf-8"))
+                if size > max_bytes:
+                    raise GitError("Review exceeds the configured context byte limit")
+                patches[file] = patch
+            return patches
+
     async def log(self, path: Path, *, limit: int = 20) -> JsonObject:
         """Return recent commit IDs and subjects; unborn repositories have none."""
         if not 1 <= limit <= 100:

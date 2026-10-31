@@ -96,3 +96,10 @@ Optional `CODEFORGE_ANALYSIS_PYTHON_EXECUTABLE` selects an interpreter with both
 Timeout, output, and diagnostic limits are configurable in `.env.example`.
 
 Run lint, type checks, and tests with `make check`.
+
+Generate a read-only code review with `POST /repositories/REPOSITORY_ID/reviews`
+and `{}` for unstaged tracked changes, `{"staged":true}` for the index, or
+`{"base_ref":"main"}` for committed changes since the merge base with `main`.
+Results include validated findings, a summary, risk assessment, and skipped files.
+Binary and metadata-only changes require manual review. Oversized reviews are rejected;
+configure `CODEFORGE_REVIEW_MAX_FILES` and `CODEFORGE_REVIEW_MAX_CONTEXT_BYTES` as needed.

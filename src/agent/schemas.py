@@ -3,9 +3,16 @@
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 from agent.models import AgentMessageRole, AgentRunMode, AgentRunStatus, AgentRunType
 
@@ -224,3 +231,57 @@ class AgentRunResponse(BaseModel):
     tool_events: list[ToolEventResponse]
     test_results: list[PytestExecutionResponse]
     analysis_results: list[AnalysisExecutionResponse]
+
+
+class ReviewCreate(BaseModel):
+    """Select unstaged changes, staged changes, or committed changes since a base ref."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    staged: bool = False
+    base_ref: str | None = Field(default=None, min_length=1, max_length=255)
+
+    @model_validator(mode="after")
+    def validate_selection(self) -> ReviewCreate:
+        if self.staged and self.base_ref is not None:
+            raise ValueError("Select staged changes or a base ref, not both")
+        if self.base_ref is not None and (
+            self.base_ref.startswith("-")
+            or any(character.isspace() or character == "\0" for character in self.base_ref)
+        ):
+            raise ValueError("Invalid base ref")
+        return self
+
+
+class ReviewFinding(BaseModel):
+    """One actionable issue anchored to a changed line in the old or new file."""
+
+    model_config = ConfigDict(extra="forbid", strict=True, str_strip_whitespace=True)
+
+    severity: Literal["critical", "high", "medium", "low"]
+    file: Annotated[str, StringConstraints(strip_whitespace=False)] = Field(
+        min_length=1, max_length=1024
+    )
+    line: int = Field(ge=1)
+    side: Literal["old", "new"]
+    explanation: str = Field(min_length=1, max_length=4000)
+    suggestion: str = Field(min_length=1, max_length=4000)
+
+
+class ReviewReport(BaseModel):
+    """Structured model output validated before returning a review."""
+
+    model_config = ConfigDict(extra="forbid", strict=True, str_strip_whitespace=True)
+
+    summary: str = Field(min_length=1, max_length=4000)
+    risk_level: Literal["low", "medium", "high", "unknown"]
+    risk_assessment: str = Field(min_length=1, max_length=4000)
+    findings: list[ReviewFinding] = Field(max_length=100)
+
+
+class ReviewResponse(ReviewReport):
+    """Review results plus explicit coverage and validation information."""
+
+    reviewed_files: list[str]
+    skipped_files: list[str]
+    discarded_findings: int

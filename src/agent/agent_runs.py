@@ -46,6 +46,21 @@ def get_model_client(request: Request) -> ModelClient:
 ModelClientDependency = Annotated[ModelClient, Depends(get_model_client)]
 
 
+def get_git_service(request: Request, access: RepositoryAccess) -> GitService:
+    """Share repository locks across agent runs and review snapshot collection."""
+    service: GitService | None = request.app.state.git_service
+    if service is None:
+        settings = request.app.state.settings
+        service = GitService(
+            access,
+            allow_mutations=settings.git_allow_mutations,
+            timeout_seconds=settings.git_timeout_seconds,
+            max_output_bytes=settings.git_max_output_bytes,
+        )
+        request.app.state.git_service = service
+    return service
+
+
 @router.post("", response_model=AgentRunResponse, status_code=status.HTTP_201_CREATED)
 async def create_agent_run(
     repository_id: uuid.UUID,
@@ -96,15 +111,7 @@ def build_agent_runner(
         raise HTTPException(
             status_code=403, detail="Enable CODEFORGE_CODE_WRITES_ENABLED for write runs"
         )
-    git_service: GitService | None = request.app.state.git_service
-    if git_service is None:
-        git_service = GitService(
-            access,
-            allow_mutations=settings.git_allow_mutations,
-            timeout_seconds=settings.git_timeout_seconds,
-            max_output_bytes=settings.git_max_output_bytes,
-        )
-        request.app.state.git_service = git_service
+    git_service = get_git_service(request, access)
     registry = create_agent_tool_registry(git_service, allow_mutations=mode is AgentRunMode.WRITE)
     patch_service = PatchService(
         access,

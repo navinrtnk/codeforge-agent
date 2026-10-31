@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     max_tool_output_bytes: int = Field(default=100_000, ge=256)
     agent_max_iterations: int = Field(default=8, ge=1, le=100)
     bug_fix_max_attempts: int = Field(default=3, ge=1, le=20)
+    review_max_files: int = Field(default=50, ge=1, le=500)
+    review_max_context_bytes: int = Field(default=100_000, ge=512)
     agent_max_output_tokens: int = Field(default=4096, ge=1)
     agent_timeout_seconds: float = Field(default=120.0, gt=0)
     conversation_history_token_budget: int = Field(default=8192, ge=256)

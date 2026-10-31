@@ -11,6 +11,7 @@ from agent.conversations import router as conversations_router
 from agent.database import Database
 from agent.models_api import ModelClient
 from agent.repositories import router as repositories_router
+from agent.reviews import router as reviews_router
 
 
 def create_app(
@@ -46,6 +47,7 @@ def create_app(
     application.include_router(repositories_router)
     application.include_router(agent_runs_router)
     application.include_router(conversations_router)
+    application.include_router(reviews_router)
     return application
 
 
