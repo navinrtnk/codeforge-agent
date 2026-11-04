@@ -5,6 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from agent.embeddings import EmbeddingClient
 from agent.git_service import GitError, GitService
 from agent.models_api import JsonObject
 from agent.repository_tools import ToolArguments, create_repository_tool_registry
@@ -109,9 +110,16 @@ def create_agent_tool_registry(
     service: GitService,
     *,
     allow_mutations: bool | None = None,
+    embedding_client: EmbeddingClient | None = None,
+    lexical_weight: float = 0.5,
+    semantic_weight: float = 0.5,
 ) -> ToolRegistry:
     """Combine file tools with Git inspection and optionally Git mutation tools."""
-    registry = create_repository_tool_registry()
+    registry = create_repository_tool_registry(
+        embedding_client,
+        lexical_weight=lexical_weight,
+        semantic_weight=semantic_weight,
+    )
     definitions: list[tuple[GitAction, str, type[BaseModel]]] = [
         (
             "status",

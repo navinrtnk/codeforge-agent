@@ -9,6 +9,7 @@ from agent.agent_runs import router as agent_runs_router
 from agent.config import Settings, get_settings
 from agent.conversations import router as conversations_router
 from agent.database import Database
+from agent.embeddings import EmbeddingClient
 from agent.models_api import ModelClient
 from agent.repositories import router as repositories_router
 from agent.reviews import router as reviews_router
@@ -18,6 +19,7 @@ def create_app(
     settings: Settings | None = None,
     *,
     model_client: ModelClient | None = None,
+    embedding_client: EmbeddingClient | None = None,
 ) -> FastAPI:
     """Create and configure the FastAPI application."""
     application_settings = settings or get_settings()
@@ -37,6 +39,8 @@ def create_app(
     )
     application.state.settings = application_settings
     application.state.model_client = model_client
+    application.state.embedding_client = embedding_client
+    application.state.index_locks = {}
     application.state.git_service = None
 
     @application.get("/health", tags=["system"])

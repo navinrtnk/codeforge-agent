@@ -103,3 +103,9 @@ and `{}` for unstaged tracked changes, `{"staged":true}` for the index, or
 Results include validated findings, a summary, risk assessment, and skipped files.
 Binary and metadata-only changes require manual review. Oversized reviews are rejected;
 configure `CODEFORGE_REVIEW_MAX_FILES` and `CODEFORGE_REVIEW_MAX_CONTEXT_BYTES` as needed.
+
+Enable `CODEFORGE_EMBEDDINGS_ENABLED=true` with `CODEFORGE_OPENAI_API_KEY`, then reindex
+to use `mode=semantic` or `mode=hybrid` in search and `search_code`. Indexing sends bounded
+chunk text to OpenAI and stores vectors locally; unchanged chunks reuse their embeddings.
+Configure `CODEFORGE_EMBEDDING_MODEL`, `CODEFORGE_EMBEDDING_DIMENSIONS`, and the hybrid
+weights `CODEFORGE_SEARCH_LEXICAL_WEIGHT` / `CODEFORGE_SEARCH_SEMANTIC_WEIGHT` as needed.

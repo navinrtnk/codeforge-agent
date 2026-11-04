@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -34,6 +34,14 @@ class Settings(BaseSettings):
     )
     max_file_size_bytes: int = Field(default=1_000_000, gt=0)
     index_chunk_size_lines: int = Field(default=200, gt=0)
+    embeddings_enabled: bool = False
+    embedding_model: str = Field(default="text-embedding-3-small", min_length=1, max_length=255)
+    embedding_dimensions: int = Field(default=1536, ge=1, le=3072)
+    embedding_batch_size: int = Field(default=32, ge=1, le=32)
+    embedding_max_input_bytes: int = Field(default=8000, ge=4, le=8000)
+    embedding_timeout_seconds: float = Field(default=30, gt=0)
+    search_lexical_weight: float = Field(default=0.5, ge=0, le=1, allow_inf_nan=False)
+    search_semantic_weight: float = Field(default=0.5, ge=0, le=1, allow_inf_nan=False)
     max_tool_output_bytes: int = Field(default=100_000, ge=256)
     agent_max_iterations: int = Field(default=8, ge=1, le=100)
     bug_fix_max_attempts: int = Field(default=3, ge=1, le=20)
@@ -66,6 +74,12 @@ class Settings(BaseSettings):
     model_name: str | None = None
     openai_api_key: SecretStr | None = None
     anthropic_api_key: SecretStr | None = None
+
+    @model_validator(mode="after")
+    def validate_search_weights(self) -> Settings:
+        if self.search_lexical_weight + self.search_semantic_weight == 0:
+            raise ValueError("At least one search weight must be positive")
+        return self
 
 
 @lru_cache

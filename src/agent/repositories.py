@@ -1,5 +1,6 @@
 """Repository registration API."""
 
+import asyncio
 import uuid
 from typing import Annotated, Literal
 
@@ -9,6 +10,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from agent.database import get_database_session
+from agent.embedding_index import index_with_embeddings
+from agent.embeddings import (
+    EmbeddingClient,
+    EmbeddingError,
+    EmbeddingIndexError,
+    create_embedding_client,
+)
 from agent.indexing import IndexingResult, IndexStatus, RepositoryIndexer, get_index_status
 from agent.models import Repository
 from agent.repository_access import (
@@ -33,6 +41,7 @@ from agent.search import (
     lexical_search,
     symbol_search,
 )
+from agent.semantic_search import search_with_embeddings
 
 router = APIRouter(prefix="/repositories", tags=["repositories"])
 SessionDependency = Annotated[Session, Depends(get_database_session)]
@@ -49,6 +58,20 @@ def get_repository_access(request: Request) -> RepositoryAccess:
 
 
 RepositoryAccessDependency = Annotated[RepositoryAccess, Depends(get_repository_access)]
+
+
+def get_embedding_client(request: Request) -> EmbeddingClient:
+    """Lazily resolve an explicitly enabled embedding provider or an injected test client."""
+    if not request.app.state.settings.embeddings_enabled:
+        raise HTTPException(status_code=503, detail="Enable CODEFORGE_EMBEDDINGS_ENABLED")
+    client: EmbeddingClient | None = request.app.state.embedding_client
+    if client is None:
+        try:
+            client = create_embedding_client(request.app.state.settings)
+        except EmbeddingError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+        request.app.state.embedding_client = client
+    return client
 
 
 @router.post("", response_model=RepositoryResponse, status_code=status.HTTP_201_CREATED)
@@ -103,7 +126,7 @@ def list_repositories(
 
 
 @router.post("/{repository_id}/index", response_model=IndexingResponse)
-def index_repository(
+async def index_repository(
     repository_id: uuid.UUID,
     session: SessionDependency,
     access: RepositoryAccessDependency,
@@ -115,7 +138,22 @@ def index_repository(
         access,
         chunk_size_lines=request.app.state.settings.index_chunk_size_lines,
     )
-    return indexer.index(session, repository)
+    if not request.app.state.settings.embeddings_enabled:
+        return indexer.index(session, repository)
+    try:
+        locks: dict[uuid.UUID, asyncio.Lock] = request.app.state.index_locks
+        async with locks.setdefault(repository_id, asyncio.Lock()):
+            return await index_with_embeddings(
+                session,
+                repository,
+                indexer,
+                get_embedding_client(request),
+                batch_size=request.app.state.settings.embedding_batch_size,
+            )
+    except EmbeddingError as error:
+        raise HTTPException(
+            status_code=502, detail="Unable to generate repository embeddings"
+        ) from error
 
 
 @router.get("/{repository_id}/index/status", response_model=IndexStatusResponse)
@@ -129,15 +167,16 @@ def repository_index_status(
 
 
 @router.get("/{repository_id}/search", response_model=list[SearchResultResponse])
-def search_repository(
+async def search_repository(
     repository_id: uuid.UUID,
     session: SessionDependency,
+    request: Request,
     q: Annotated[str, Query(min_length=1, max_length=500)],
-    mode: Annotated[Literal["lexical", "exact"], Query()] = "lexical",
+    mode: Annotated[Literal["lexical", "exact", "semantic", "hybrid"], Query()] = "lexical",
     case_sensitive: Annotated[bool, Query()] = False,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> list[SearchResult]:
-    """Search indexed repository chunks using lexical or exact matching."""
+    """Search indexed chunks with exact, lexical, semantic, or combined ranking."""
     _get_repository(session, repository_id)
     try:
         if mode == "exact":
@@ -148,7 +187,25 @@ def search_repository(
                 case_sensitive=case_sensitive,
                 limit=limit,
             )
+        settings = request.app.state.settings
+        if (mode == "semantic" or mode == "hybrid") and not (
+            mode == "hybrid" and settings.search_semantic_weight == 0
+        ):
+            return await search_with_embeddings(
+                session,
+                repository_id,
+                q,
+                get_embedding_client(request),
+                mode=mode,
+                limit=limit,
+                lexical_weight=settings.search_lexical_weight,
+                semantic_weight=settings.search_semantic_weight,
+            )
         return lexical_search(session, repository_id, q, limit=limit)
+    except EmbeddingIndexError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except EmbeddingError as error:
+        raise HTTPException(status_code=502, detail="Unable to embed the search query") from error
     except InvalidSearchQueryError as error:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,

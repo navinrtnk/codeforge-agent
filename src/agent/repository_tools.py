@@ -5,9 +5,11 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from agent.embeddings import EmbeddingClient, EmbeddingError
 from agent.models_api import JsonObject
 from agent.repository_access import RepositoryAccessError
 from agent.search import InvalidSearchQueryError, exact_search, lexical_search
+from agent.semantic_search import search_with_embeddings
 from agent.tools import ToolContext, ToolExecutionError, ToolRegistry
 
 
@@ -84,7 +86,7 @@ class SearchCodeArguments(ToolArguments):
     """Arguments for indexed repository search."""
 
     query: str = Field(min_length=1, max_length=500)
-    mode: Literal["lexical", "exact"] = "lexical"
+    mode: Literal["lexical", "exact", "semantic", "hybrid"] = "lexical"
     case_sensitive: bool = False
     limit: int = Field(default=20, ge=1, le=100)
 
@@ -93,8 +95,19 @@ class SearchCodeTool:
     """Search persisted source chunks in the active repository."""
 
     name = "search_code"
-    description = "Search indexed code using ranked lexical or literal exact matching."
+    description = "Search indexed code using lexical, exact, semantic, or hybrid ranking."
     arguments_model = SearchCodeArguments
+
+    def __init__(
+        self,
+        embedding_client: EmbeddingClient | None = None,
+        *,
+        lexical_weight: float = 0.5,
+        semantic_weight: float = 0.5,
+    ) -> None:
+        self.embedding_client = embedding_client
+        self.lexical_weight = lexical_weight
+        self.semantic_weight = semantic_weight
 
     async def execute(self, context: ToolContext, arguments: BaseModel) -> JsonObject:
         validated = SearchCodeArguments.model_validate(arguments)
@@ -107,6 +120,21 @@ class SearchCodeTool:
                     case_sensitive=validated.case_sensitive,
                     limit=validated.limit,
                 )
+            elif (validated.mode == "semantic" or validated.mode == "hybrid") and not (
+                validated.mode == "hybrid" and self.semantic_weight == 0
+            ):
+                if self.embedding_client is None:
+                    raise ToolExecutionError("Semantic search requires enabled embeddings")
+                results = await search_with_embeddings(
+                    context.session,
+                    context.repository.id,
+                    validated.query,
+                    self.embedding_client,
+                    mode=validated.mode,
+                    limit=validated.limit,
+                    lexical_weight=self.lexical_weight,
+                    semantic_weight=self.semantic_weight,
+                )
             else:
                 results = lexical_search(
                     context.session,
@@ -114,7 +142,7 @@ class SearchCodeTool:
                     validated.query,
                     limit=validated.limit,
                 )
-        except InvalidSearchQueryError as error:
+        except (InvalidSearchQueryError, EmbeddingError) as error:
             raise ToolExecutionError(str(error)) from error
         return {
             "results": [
@@ -132,10 +160,21 @@ class SearchCodeTool:
         }
 
 
-def create_repository_tool_registry() -> ToolRegistry:
+def create_repository_tool_registry(
+    embedding_client: EmbeddingClient | None = None,
+    *,
+    lexical_weight: float = 0.5,
+    semantic_weight: float = 0.5,
+) -> ToolRegistry:
     """Create the explicit set of repository tools available to agents."""
     registry = ToolRegistry()
     registry.register(ListFilesTool())
     registry.register(ReadFileTool())
-    registry.register(SearchCodeTool())
+    registry.register(
+        SearchCodeTool(
+            embedding_client,
+            lexical_weight=lexical_weight,
+            semantic_weight=semantic_weight,
+        )
+    )
     return registry

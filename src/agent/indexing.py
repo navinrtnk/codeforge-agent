@@ -123,7 +123,13 @@ class RepositoryIndexer:
         self.access = access
         self.chunk_size_lines = chunk_size_lines
 
-    def index(self, session: Session, repository: Repository) -> IndexingResult:
+    def index(
+        self,
+        session: Session,
+        repository: Repository,
+        *,
+        commit: bool = True,
+    ) -> IndexingResult:
         """Synchronize persisted files and chunks with repository contents."""
         discovered_files = self.access.list_files(Path(repository.path))
         statement = (
@@ -204,7 +210,8 @@ class RepositoryIndexer:
             session.delete(existing_files[deleted_path])
         session.flush()
         sync_repository_fts(session, repository.id)
-        session.commit()
+        if commit:
+            session.commit()
 
         return IndexingResult(
             discovered=len(discovered_files),

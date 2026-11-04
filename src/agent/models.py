@@ -206,6 +206,27 @@ class CodeChunk(Base):
     content: Mapped[str] = mapped_column(Text)
 
     indexed_file: Mapped[IndexedFile] = relationship(back_populates="chunks")
+    embedding: Mapped[ChunkEmbedding | None] = relationship(
+        back_populates="chunk",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
+
+class ChunkEmbedding(Base):
+    """One model-specific vector for the current content of an indexed chunk."""
+
+    __tablename__ = "chunk_embeddings"
+
+    chunk_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("code_chunks.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    model_key: Mapped[str] = mapped_column(String(512), index=True)
+    content_hash: Mapped[str] = mapped_column(String(64))
+    vector: Mapped[list[float]] = mapped_column(JSON)
+
+    chunk: Mapped[CodeChunk] = relationship(back_populates="embedding")
 
 
 class CodeSymbol(Base):

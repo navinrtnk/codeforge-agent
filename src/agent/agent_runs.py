@@ -19,7 +19,7 @@ from agent.patch_service import PatchService
 from agent.patch_tools import PatchTool
 from agent.pytest_runner import PytestRunner
 from agent.pytest_tool import PytestTool
-from agent.repositories import RepositoryAccessDependency
+from agent.repositories import RepositoryAccessDependency, get_embedding_client
 from agent.repository_access import RepositoryAccess
 from agent.schemas import AgentRunCreate, AgentRunResponse, AgentTaskCreate
 from agent.static_analysis import StaticAnalysisRunner
@@ -112,7 +112,13 @@ def build_agent_runner(
             status_code=403, detail="Enable CODEFORGE_CODE_WRITES_ENABLED for write runs"
         )
     git_service = get_git_service(request, access)
-    registry = create_agent_tool_registry(git_service, allow_mutations=mode is AgentRunMode.WRITE)
+    registry = create_agent_tool_registry(
+        git_service,
+        allow_mutations=mode is AgentRunMode.WRITE,
+        embedding_client=get_embedding_client(request) if settings.embeddings_enabled else None,
+        lexical_weight=settings.search_lexical_weight,
+        semantic_weight=settings.search_semantic_weight,
+    )
     patch_service = PatchService(
         access,
         git_service,
