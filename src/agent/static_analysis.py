@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
+from agent.command_sandbox import CommandSandbox, LocalCommandSandbox, SandboxError
 from agent.process_runner import ProcessResult, ProcessRunner
 from agent.project_tools import AnalysisError, AnalysisTool, detect_configuration
 from agent.repository_access import RepositoryAccess, RepositoryAccessError
@@ -55,7 +56,12 @@ def _optional_position(value: Any, offset: int = 0) -> int | None:
 
 
 def normalize_diagnostics(
-    output: str, tool: AnalysisTool, repository: Path, *, limit: int = 200
+    output: str,
+    tool: AnalysisTool,
+    repository: Path,
+    *,
+    limit: int = 200,
+    execution_root: Path | None = None,
 ) -> tuple[tuple[Diagnostic, ...], bool, bool]:
     """Parse JSON lines, retaining valid records without trusting paths or malformed output."""
     diagnostics: list[Diagnostic] = []
@@ -68,7 +74,14 @@ def normalize_diagnostics(
             filename = record["filename" if tool == "ruff" else "file"]
             if not isinstance(filename, str) or not filename or "\0" in filename:
                 raise ValueError("Invalid diagnostic path")
-            path = (repository / filename).resolve()
+            source = Path(filename)
+            if (
+                execution_root is not None
+                and source.is_absolute()
+                and source.is_relative_to(execution_root)
+            ):
+                source = source.relative_to(execution_root)
+            path = (repository / source).resolve()
             if not path.is_relative_to(repository) or ".git" in path.relative_to(repository).parts:
                 raise ValueError("Diagnostic outside repository")
             start = record["location"] if tool == "ruff" else record
@@ -118,6 +131,7 @@ class StaticAnalysisRunner:
         max_output_bytes: int = 20_000,
         max_diagnostics: int = 200,
         process_runner: ProcessRunner | None = None,
+        sandbox: CommandSandbox | None = None,
     ) -> None:
         self.access = access
         self.enabled = enabled
@@ -127,7 +141,7 @@ class StaticAnalysisRunner:
         if max_diagnostics < 1:
             raise ValueError("Diagnostic limit must be positive")
         self.max_diagnostics = max_diagnostics
-        self.process_runner = process_runner or ProcessRunner()
+        self.sandbox = sandbox or LocalCommandSandbox(self.python, process_runner=process_runner)
 
     def _targets(self, repository: Path, paths: list[str]) -> tuple[str, ...]:
         if len(paths) > 50:
@@ -168,23 +182,24 @@ class StaticAnalysisRunner:
             config = detect_configuration(self.access, repository, tool)
         except RepositoryAccessError as error:
             raise AnalysisError(str(error)) from error
+        execution_root = self.sandbox.repository_path(repository)
         command = [str(self.python), "-m", tool]
         if tool == "ruff":
             command += ["check", "--output-format", "json-lines", "--no-fix", "--no-fix-only"]
             command += ["--no-cache"]
             command += (
-                ["--config", str(repository / config.file)] if config.file else ["--isolated"]
+                ["--config", str(execution_root / config.file)] if config.file else ["--isolated"]
             )
             command += ["--", *(targets or (".",))]
         else:
             command += [
                 "--config-file",
-                str(repository / config.file) if config.file else os.devnull,
+                str(execution_root / config.file) if config.file else self.sandbox.null_device,
                 "--output",
                 "json",
                 "--no-incremental",
                 "--cache-dir",
-                os.devnull,
+                self.sandbox.null_device,
                 "--no-install-types",
                 "--no-pretty",
                 "--no-color-output",
@@ -192,21 +207,28 @@ class StaticAnalysisRunner:
                 "--show-column-numbers",
                 "--show-error-codes",
                 "--junit-xml",
-                os.devnull,
+                self.sandbox.null_device,
             ]
             command += ["--", *targets] if targets else ([] if config.has_files else ["--", "."])
         allowed = {"PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "TMPDIR", "LANG", "TZ"}
         environment = {key: value for key, value in os.environ.items() if key.upper() in allowed}
         environment.update(PYTHONIOENCODING="utf-8", PYTHONUNBUFFERED="1", NO_COLOR="1")
-        process = await self.process_runner.run(
-            tuple(command),
-            cwd=repository,
-            environment=environment,
-            timeout_seconds=self.timeout_seconds,
-            max_output_bytes=self.max_output_bytes,
-        )
+        try:
+            process = await self.sandbox.run(
+                tuple(command),
+                cwd=repository,
+                environment=environment,
+                timeout_seconds=self.timeout_seconds,
+                max_output_bytes=self.max_output_bytes,
+            )
+        except SandboxError as error:
+            raise AnalysisError(str(error)) from error
         diagnostics, complete, truncated = normalize_diagnostics(
-            process.stdout, tool, repository, limit=self.max_diagnostics
+            process.stdout,
+            tool,
+            repository,
+            limit=self.max_diagnostics,
+            execution_root=execution_root,
         )
         complete = complete and not (process.stdout_truncated or process.stderr_truncated)
         status = {0: "passed", 1: "findings"}.get(

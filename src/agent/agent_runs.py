@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from agent.agent_runner import AgentRunner
 from agent.analysis_tools import StaticAnalysisTool
+from agent.command_sandbox import create_command_sandbox
 from agent.database import get_database_session
 from agent.git_service import GitService
 from agent.git_tools import create_agent_tool_registry
@@ -137,6 +138,7 @@ def build_agent_runner(
                 timeout_seconds=settings.analysis_timeout_seconds,
                 max_output_bytes=settings.analysis_max_output_bytes,
                 max_diagnostics=settings.analysis_max_diagnostics,
+                sandbox=create_command_sandbox(settings, settings.analysis_python_executable),
             )
             registry.register(StaticAnalysisTool(analysis_runner, "ruff"))
             registry.register(StaticAnalysisTool(analysis_runner, "mypy"))
@@ -149,6 +151,7 @@ def build_agent_runner(
                         python_executable=settings.test_python_executable,
                         timeout_seconds=settings.test_timeout_seconds,
                         max_output_bytes=settings.test_max_output_bytes,
+                        sandbox=create_command_sandbox(settings, settings.test_python_executable),
                     )
                 )
             )

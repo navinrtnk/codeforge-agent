@@ -62,6 +62,25 @@ class Settings(BaseSettings):
     patch_max_bytes: int = Field(default=100_000, ge=1)
     patch_max_files: int = Field(default=10, ge=1, le=100)
     test_execution_enabled: bool = False
+    command_execution_backend: Literal["local", "docker"] = "local"
+    sandbox_image: str = Field(
+        default="codeforge-agent:local", pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._/:@-]*$"
+    )
+    sandbox_python_executable: str = Field(
+        default="/opt/codeforge/.venv/bin/python", pattern=r"^/[^\x00]+$"
+    )
+    docker_host_workspace_root: Path | None = None
+    sandbox_cpus: float = Field(default=1, gt=0, allow_inf_nan=False)
+    sandbox_memory_mb: int = Field(default=512, ge=16)
+    sandbox_pids_limit: int = Field(default=128, ge=16)
+    sandbox_tmpfs_mb: int = Field(default=128, ge=16)
+    sandbox_timeout_seconds: float = Field(default=60, gt=0, allow_inf_nan=False)
+    sandbox_network_enabled: bool = False
+    sandbox_allowed_commands: tuple[Literal["pytest", "ruff", "mypy"], ...] = (
+        "pytest",
+        "ruff",
+        "mypy",
+    )
     test_python_executable: Path | None = None
     test_timeout_seconds: float = Field(default=60.0, gt=0)
     test_max_output_bytes: int = Field(default=20_000, ge=256)
@@ -76,9 +95,14 @@ class Settings(BaseSettings):
     anthropic_api_key: SecretStr | None = None
 
     @model_validator(mode="after")
-    def validate_search_weights(self) -> Settings:
+    def validate_configuration(self) -> Settings:
         if self.search_lexical_weight + self.search_semantic_weight == 0:
             raise ValueError("At least one search weight must be positive")
+        if (
+            self.docker_host_workspace_root is not None
+            and not self.docker_host_workspace_root.is_absolute()
+        ):
+            raise ValueError("Docker host workspace root must be absolute")
         return self
 
 

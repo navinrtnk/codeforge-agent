@@ -9,6 +9,7 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
+from agent.command_sandbox import CommandSandbox, LocalCommandSandbox, SandboxError
 from agent.process_runner import ProcessResult, ProcessRunner
 from agent.repository_access import RepositoryAccess, RepositoryAccessError
 
@@ -59,6 +60,7 @@ class PytestRunner:
         timeout_seconds: float = 60,
         max_output_bytes: int = 20_000,
         process_runner: ProcessRunner | None = None,
+        sandbox: CommandSandbox | None = None,
     ) -> None:
         self.access = access
         self.enabled = enabled
@@ -66,7 +68,7 @@ class PytestRunner:
         self.python = (python_executable or Path(sys.executable)).expanduser().absolute()
         self.timeout_seconds = timeout_seconds
         self.max_output_bytes = max_output_bytes
-        self.process_runner = process_runner or ProcessRunner()
+        self.sandbox = sandbox or LocalCommandSandbox(self.python, process_runner=process_runner)
 
     def detect_configuration(self, repository: Path) -> str | None:
         """Inspect only local configuration files; never import project code."""
@@ -137,15 +139,21 @@ class PytestRunner:
         environment.update(
             PYTEST_DISABLE_PLUGIN_AUTOLOAD="1", PYTHONIOENCODING="utf-8", PYTHONUNBUFFERED="1"
         )
+        execution_root = self.sandbox.repository_path(repository)
         arguments = [str(self.python), "-m", "pytest"]
         # An explicit root/config prevents pytest discovering parent-project configuration.
         arguments.extend(
-            ["--rootdir", str(repository), "-c", str(repository / config) if config else os.devnull]
+            [
+                "--rootdir",
+                str(execution_root),
+                "-c",
+                str(execution_root / config) if config else self.sandbox.null_device,
+            ]
         )
         arguments.extend(
             [
                 "--confcutdir",
-                str(repository),
+                str(execution_root),
                 "-q",
                 "--color=no",
                 "--tb=short",
@@ -159,13 +167,16 @@ class PytestRunner:
         # An empty cache prefix forces fresh source imports without altering repo caches.
         with tempfile.TemporaryDirectory(prefix="codeforge-pycache-") as cache:
             environment.update(PYTHONPYCACHEPREFIX=cache, PYTHONDONTWRITEBYTECODE="1")
-            process = await self.process_runner.run(
-                tuple(arguments),
-                cwd=repository,
-                environment=environment,
-                timeout_seconds=self.timeout_seconds,
-                max_output_bytes=self.max_output_bytes,
-            )
+            try:
+                process = await self.sandbox.run(
+                    tuple(arguments),
+                    cwd=repository,
+                    environment=environment,
+                    timeout_seconds=self.timeout_seconds,
+                    max_output_bytes=self.max_output_bytes,
+                )
+            except SandboxError as error:
+                raise PytestRunnerError(str(error)) from error
         counts, complete = parse_summary(process.stdout)
         status = {
             0: "passed",

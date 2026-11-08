@@ -1,0 +1,26 @@
+services:
+  api:
+    build: .
+    image: codeforge-agent:local
+    init: true
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      CODEFORGE_WORKSPACE_ROOT: /workspace
+      CODEFORGE_DATABASE_URL: sqlite:////data/codeforge.db
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - type: bind
+        source: ${CODEFORGE_WORKSPACE_ROOT:-.}
+        target: /workspace
+      - codeforge-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=128m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+volumes:
+  codeforge-data:

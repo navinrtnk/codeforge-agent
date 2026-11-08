@@ -1,0 +1,12 @@
+# Explicit opt-in: access to this socket grants control over the host Docker daemon.
+services:
+  api:
+    environment:
+      CODEFORGE_COMMAND_EXECUTION_BACKEND: docker
+      CODEFORGE_DOCKER_HOST_WORKSPACE_ROOT: ${CODEFORGE_WORKSPACE_ROOT:?Set an absolute workspace path}
+    group_add:
+      - ${CODEFORGE_DOCKER_GID:?Set the numeric group ID of /var/run/docker.sock}
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock

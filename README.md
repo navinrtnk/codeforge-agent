@@ -80,7 +80,8 @@ runs. Ask for all tests or specific paths, such as `tests/test_api.py`; results
 are saved under `test_results`. Tests execute trusted repository code locally.
 `CODEFORGE_TEST_TIMEOUT_SECONDS` and `CODEFORGE_TEST_MAX_OUTPUT_BYTES` bound execution;
 set `CODEFORGE_TEST_PYTHON_EXECUTABLE` to a project interpreter with its dependencies
-installed, or leave it unset to use the service's Python. Docker isolation comes later.
+installed, or leave it unset to use the service's Python. For Docker isolation, build the image
+and set `CODEFORGE_COMMAND_EXECUTION_BACKEND=docker`; see [sandbox setup and limits](docs/sandbox.md).
 
 With writes and test execution enabled, `POST /repositories/REPOSITORY_ID/runs/bug-fix`
 with `{"task":"Fix the bug"}` investigates and patches, then automatically runs the full
