@@ -2,23 +2,20 @@
 
 [![tests](https://github.com/navinrtnk/codeforge-agent/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/navinrtnk/codeforge-agent/actions/workflows/tests.yml)
 
-A local AI software engineering agent that helps you understand a codebase. It
-indexes source code, answers repository questions, inspects Git changes, and
-remembers conversations across runs.
+A local coding agent that helps you find your way around a repository, review changes,
+and fix bugs with test feedback. It works with OpenAI or Anthropic models and keeps
+conversation history in SQLite so you can pick up where you left off.
 
-Built with Python, FastAPI, SQLite, and OpenAI or Anthropic models. It can apply
-validated text patches, run pytest, check code with Ruff/mypy, and retry bug fixes until verified.
+## Get started
 
-## Run locally
-
-Requires Python 3.14.7, Git, and [uv](https://docs.astral.sh/uv/).
+You'll need Python 3.14.7, Git, and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync
 cp .env.example .env
 ```
 
-Edit `.env` with your repository workspace and model credentials:
+Set your workspace and model credentials in `.env`:
 
 ```dotenv
 CODEFORGE_WORKSPACE_ROOT=/absolute/path/to/your/repos
@@ -27,86 +24,35 @@ CODEFORGE_MODEL_NAME=YOUR_MODEL_ID
 CODEFORGE_OPENAI_API_KEY=YOUR_API_KEY
 ```
 
-For Anthropic, set the provider to `anthropic` and use
-`CODEFORGE_ANTHROPIC_API_KEY` instead.
+For Anthropic, use `anthropic` and `CODEFORGE_ANTHROPIC_API_KEY` instead.
+Then start the API:
 
 ```bash
 uv run uvicorn agent.main:app --reload
 ```
 
-Open [interactive API docs](http://127.0.0.1:8000/docs) to explore all endpoints.
-
-## Examples
-
-**1. Register and index a repository**
-
-The repository must be inside your configured workspace. Replace
-`REPOSITORY_ID` below with the `id` returned by registration.
-
-```bash
-curl -X POST http://127.0.0.1:8000/repositories \
-  -H "Content-Type: application/json" \
-  -d '{"name":"my-project","path":"/absolute/path/to/your/repos/my-project"}'
-
-curl -X POST http://127.0.0.1:8000/repositories/REPOSITORY_ID/index
-```
-
-**2. Search indexed code**
-
-```bash
-curl "http://127.0.0.1:8000/repositories/REPOSITORY_ID/search?q=validation"
-```
-
-**3. Ask the agent about the repository**
+Open the [API docs](http://127.0.0.1:8000/docs) to register a repository inside your
+workspace and index it. Use its ID to ask a question:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/repositories/REPOSITORY_ID/runs \
   -H "Content-Type: application/json" \
-  -d '{"task":"Explain how validation works and summarize any uncommitted changes"}'
+  -d '{"task":"Explain how this project works"}'
 ```
 
-The response includes the answer in the assistant messages, run status, and tool
-history. Runs are saved in SQLite; conversation endpoints support follow-up questions.
+## What you can do
 
-Runs default to `"mode":"read_only"`. To edit files, enable
-`CODEFORGE_CODE_WRITES_ENABLED=true` in `.env` and send `"mode":"write"` with the
-task (or conversation message). The agent can dry-run unified diffs with
-`validate_patch`, then use `apply_patch` for bounded edits with rollback on write
-failure. Limits: `CODEFORGE_PATCH_MAX_BYTES` and `CODEFORGE_PATCH_MAX_FILES`.
-Reindex after editing to refresh search.
+- Search code by keyword, exact text, symbol, or meaning.
+- Ask follow-up questions in a saved conversation.
+- Review staged changes or compare a branch with its base.
+- Apply patches and retry bug fixes until tests pass or the attempt limit is reached.
+- Connect MCP clients to CodeForge, or bring approved external tools into agent runs.
 
-Enable `CODEFORGE_TEST_EXECUTION_ENABLED=true` to expose `run_pytest` in write-mode
-runs. Ask for all tests or specific paths, such as `tests/test_api.py`; results
-are saved under `test_results`. Tests execute trusted repository code locally.
-`CODEFORGE_TEST_TIMEOUT_SECONDS` and `CODEFORGE_TEST_MAX_OUTPUT_BYTES` bound execution;
-set `CODEFORGE_TEST_PYTHON_EXECUTABLE` to a project interpreter with its dependencies
-installed, or leave it unset to use the service's Python. For Docker isolation, build the image
-and set `CODEFORGE_COMMAND_EXECUTION_BACKEND=docker`; see [sandbox setup and limits](docs/sandbox.md).
+Runs start read-only. Editing, tests, static analysis, and embeddings each need an
+explicit setting. Start with the [usage guide](docs/usage.md) when you're ready to enable them.
+For isolated execution, see [Docker setup and limits](docs/sandbox.md).
+For MCP clients and external servers, see the [MCP guide](docs/mcp.md).
 
-With writes and test execution enabled, `POST /repositories/REPOSITORY_ID/runs/bug-fix`
-with `{"task":"Fix the bug"}` investigates and patches, then automatically runs the full
-pytest suite after each patch batch. Failed checks feed another repair attempt, bounded
-by `CODEFORGE_BUG_FIX_MAX_ATTEMPTS` (default 3), agent iterations, and the run timeout.
-Responses include `run_type`, `repair_attempts`, and `verified`; unsuccessful repairs
-are explicitly unverified and leave applied edits available for inspection.
-
-Enable `CODEFORGE_ANALYSIS_EXECUTION_ENABLED=true` for `run_ruff` and `run_mypy` in
-trusted write-mode runs. Root project configuration is detected automatically
-(Ruff `extend` is unsupported); diagnostics are saved under `analysis_results`.
-Optional `CODEFORGE_ANALYSIS_PYTHON_EXECUTABLE` selects an interpreter with both tools installed.
-Timeout, output, and diagnostic limits are configurable in `.env.example`.
+## Development
 
 Run lint, type checks, and tests with `make check`.
-
-Generate a read-only code review with `POST /repositories/REPOSITORY_ID/reviews`
-and `{}` for unstaged tracked changes, `{"staged":true}` for the index, or
-`{"base_ref":"main"}` for committed changes since the merge base with `main`.
-Results include validated findings, a summary, risk assessment, and skipped files.
-Binary and metadata-only changes require manual review. Oversized reviews are rejected;
-configure `CODEFORGE_REVIEW_MAX_FILES` and `CODEFORGE_REVIEW_MAX_CONTEXT_BYTES` as needed.
-
-Enable `CODEFORGE_EMBEDDINGS_ENABLED=true` with `CODEFORGE_OPENAI_API_KEY`, then reindex
-to use `mode=semantic` or `mode=hybrid` in search and `search_code`. Indexing sends bounded
-chunk text to OpenAI and stores vectors locally; unchanged chunks reuse their embeddings.
-Configure `CODEFORGE_EMBEDDING_MODEL`, `CODEFORGE_EMBEDDING_DIMENSIONS`, and the hybrid
-weights `CODEFORGE_SEARCH_LEXICAL_WEIGHT` / `CODEFORGE_SEARCH_SEMANTIC_WEIGHT` as needed.

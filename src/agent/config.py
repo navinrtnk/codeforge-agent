@@ -7,6 +7,8 @@ from typing import Literal
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from agent.mcp_config import MCPServerConfig, ServerName
+
 
 class Settings(BaseSettings):
     """Configuration loaded from environment variables and an optional .env file."""
@@ -93,6 +95,7 @@ class Settings(BaseSettings):
     model_name: str | None = None
     openai_api_key: SecretStr | None = None
     anthropic_api_key: SecretStr | None = None
+    mcp_servers: dict[ServerName, MCPServerConfig] = Field(default_factory=dict, max_length=8)
 
     @model_validator(mode="after")
     def validate_configuration(self) -> Settings:

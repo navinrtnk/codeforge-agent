@@ -61,14 +61,24 @@ class ToolRegistry:
 
     def __init__(self) -> None:
         self._tools: dict[str, Tool] = {}
+        self._definitions: dict[str, ToolDefinition] = {}
 
-    def register(self, tool: Tool) -> None:
+    def register(self, tool: Tool, *, definition: ToolDefinition | None = None) -> None:
         """Register a uniquely named tool."""
         if not tool.name:
             raise ValueError("Tool name must not be blank")
         if tool.name in self._tools:
             raise ValueError(f"Tool is already registered: {tool.name}")
+        if definition is not None:
+            if definition.name != tool.name:
+                raise ValueError("Tool definition must match the registered name")
+            self._definitions[tool.name] = definition
         self._tools[tool.name] = tool
+
+    def unregister(self, name: str) -> None:
+        """Remove a temporary tool when its connection scope ends."""
+        self._tools.pop(name, None)
+        self._definitions.pop(name, None)
 
     def get(self, name: str) -> Tool | None:
         """Return a tool only when it was explicitly registered."""
@@ -77,7 +87,8 @@ class ToolRegistry:
     def definitions(self) -> tuple[ToolDefinition, ...]:
         """Return model-facing definitions in stable name order."""
         return tuple(
-            ToolDefinition(
+            self._definitions.get(tool.name)
+            or ToolDefinition(
                 name=tool.name,
                 description=tool.description,
                 input_schema=tool.arguments_model.model_json_schema(),

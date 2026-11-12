@@ -7,9 +7,12 @@ from time import perf_counter
 
 from pydantic import BaseModel, Field
 
+from agent.command_sandbox import create_command_sandbox
+from agent.config import Settings
 from agent.models import AgentRun, AgentRunMode, AgentRunStatus, PytestExecution
 from agent.models_api import JsonObject
 from agent.pytest_runner import COUNTS, PytestRunner, PytestRunnerError
+from agent.repository_access import RepositoryAccess
 from agent.repository_tools import ToolArguments
 from agent.tools import ToolContext, ToolExecutionError, redact_json_object
 
@@ -18,6 +21,20 @@ class PytestArguments(ToolArguments):
     """An empty list runs the configured suite; otherwise run these relative test paths."""
 
     paths: list[str] = Field(default_factory=list, max_length=50)
+
+
+def create_pytest_tool(settings: Settings, access: RepositoryAccess) -> PytestTool:
+    """Share test execution policy between HTTP agent runs and the MCP server."""
+    return PytestTool(
+        PytestRunner(
+            access,
+            enabled=settings.test_execution_enabled,
+            python_executable=settings.test_python_executable,
+            timeout_seconds=settings.test_timeout_seconds,
+            max_output_bytes=settings.test_max_output_bytes,
+            sandbox=create_command_sandbox(settings, settings.test_python_executable),
+        )
+    )
 
 
 class PytestTool:

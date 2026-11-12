@@ -18,8 +18,7 @@ from agent.models import AgentRun, AgentRunMode, AgentRunType, Repository
 from agent.models_api import ModelClient, ModelConfigurationError
 from agent.patch_service import PatchService
 from agent.patch_tools import PatchTool
-from agent.pytest_runner import PytestRunner
-from agent.pytest_tool import PytestTool
+from agent.pytest_tool import create_pytest_tool
 from agent.repositories import RepositoryAccessDependency, get_embedding_client
 from agent.repository_access import RepositoryAccess
 from agent.schemas import AgentRunCreate, AgentRunResponse, AgentTaskCreate
@@ -143,18 +142,7 @@ def build_agent_runner(
             registry.register(StaticAnalysisTool(analysis_runner, "ruff"))
             registry.register(StaticAnalysisTool(analysis_runner, "mypy"))
         if settings.test_execution_enabled:
-            registry.register(
-                PytestTool(
-                    PytestRunner(
-                        access,
-                        enabled=True,
-                        python_executable=settings.test_python_executable,
-                        timeout_seconds=settings.test_timeout_seconds,
-                        max_output_bytes=settings.test_max_output_bytes,
-                        sandbox=create_command_sandbox(settings, settings.test_python_executable),
-                    )
-                )
-            )
+            registry.register(create_pytest_tool(settings, access))
     return AgentRunner(
         model_client,
         registry,
@@ -170,6 +158,7 @@ def build_agent_runner(
         mode=mode,
         run_type=run_type,
         max_repair_attempts=settings.bug_fix_max_attempts,
+        mcp_servers=settings.mcp_servers,
     )
 
 
