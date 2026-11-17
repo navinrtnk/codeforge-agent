@@ -1,0 +1,26 @@
+{
+  "cases": [
+    {
+      "id": "explain-addition",
+      "kind": "read_only",
+      "fixture": "fixtures/addition",
+      "task": "Read calculator.py and explain why add(2, 3) is incorrect.",
+      "answer_contains": ["subtraction", "calculator.py"],
+      "script": [
+        {"tool": "read_file", "arguments": {"path": "calculator.py"}},
+        {"text": "calculator.py uses subtraction instead of addition."}
+      ]
+    },
+    {
+      "id": "repair-addition",
+      "kind": "repair",
+      "fixture": "fixtures/addition",
+      "expected_tests": "expected/addition",
+      "task": "Fix add in calculator.py to add its operands. Preserve support for negative and fractional values.",
+      "script": [
+        {"tool": "read_file", "arguments": {"path": "calculator.py"}},
+        {"tool": "apply_patch", "arguments": {"patch": "--- a/calculator.py\n+++ b/calculator.py\n@@ -1,2 +1,2 @@\n def add(left, right):\n-    return left - right\n+    return left + right\n"}}
+      ]
+    }
+  ]
+}

@@ -56,3 +56,4 @@ For MCP clients and external servers, see the [MCP guide](docs/mcp.md).
 ## Development
 
 Run lint, type checks, and tests with `make check`.
+See the [evaluation guide](docs/evaluation.md) to compare agent changes on repeatable fixtures.
