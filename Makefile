@@ -1,4 +1,4 @@
-.PHONY: install run test lint format typecheck check
+.PHONY: install run test test-unit test-integration coverage lint format typecheck check
 
 install:
 	uv sync
@@ -8,6 +8,15 @@ run:
 
 test:
 	uv run pytest
+
+test-unit:
+	uv run pytest -m "not integration"
+
+test-integration:
+	uv run pytest -m integration
+
+coverage:
+	uv run pytest --cov=agent --cov-report=term-missing --cov-report=xml:/tmp/codeforge-coverage.xml
 
 lint:
 	uv run ruff check .

@@ -31,6 +31,7 @@ from agent.git_service import GitService
 from agent.git_tools import GitDiffArguments, GitTool
 from agent.models import AgentRun, AgentRunMode, AgentRunStatus, Repository
 from agent.models_api import ToolCall
+from agent.observability import configure_logging, logger, run_id
 from agent.pytest_tool import create_pytest_tool
 from agent.repository_access import RepositoryAccess, RepositoryAccessError
 from agent.repository_tools import ReadFileTool, SearchCodeTool
@@ -53,6 +54,7 @@ def create_mcp_server(
 ) -> Server[MCPState]:
     """Expose only native tools, preserving registration, write gates, and sandbox settings."""
     configuration = settings or get_settings()
+    configure_logging()
 
     @asynccontextmanager
     async def lifespan(server: Server[MCPState]) -> AsyncIterator[MCPState]:
@@ -160,6 +162,8 @@ def create_mcp_server(
             )
             session.add(run)
             session.commit()
+            correlation = run_id.set(str(run.id))
+            logger.info("run.started")
             try:
                 async with asyncio.timeout(configuration.agent_timeout_seconds):
                     result = await ToolExecutor(
@@ -197,8 +201,12 @@ def create_mcp_server(
                 run.error_message = "MCP tool execution failed"
                 return failure(run.error_message)
             finally:
-                run.completed_at = datetime.now(UTC)
-                session.commit()
+                try:
+                    run.completed_at = datetime.now(UTC)
+                    session.commit()
+                    logger.info("run.finished", extra={"status": run.status.value})
+                finally:
+                    run_id.reset(correlation)
 
     return Server(
         "CodeForge Agent",

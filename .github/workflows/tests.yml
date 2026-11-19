@@ -29,5 +29,32 @@ jobs:
       - name: install dependencies
         run: uv sync --locked
 
-      - name: run checks
-        run: make check
+      - name: lint and type checks
+        run: make lint typecheck
+
+      - name: unit tests with coverage
+        run: uv run pytest -m "not integration" --cov=agent --cov-report= --cov-context=test
+
+      - name: build application image
+        run: docker build -t codeforge-agent:local .
+
+      - name: integration tests with coverage
+        env:
+          CODEFORGE_DOCKER_TESTS: "1"
+        run: >-
+          uv run pytest -m integration --cov=agent --cov-append
+          --cov-report=term-missing --cov-report=xml:coverage.xml --cov-context=test
+
+      - name: upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.xml
+          if-no-files-found: warn
+
+      - name: deployment smoke check
+        run: |
+          docker run -d --name codeforge-smoke -p 127.0.0.1:8000:8000 codeforge-agent:local
+          trap 'docker rm -f codeforge-smoke' EXIT
+          curl --fail --retry 15 --retry-all-errors --retry-delay 1 http://127.0.0.1:8000/health

@@ -83,7 +83,7 @@ def test_create_agent_run_requires_provider_configuration(tmp_path: Path) -> Non
         )
 
     assert response.status_code == 503
-    assert response.json() == {"detail": "CODEFORGE_MODEL_NAME is required"}
+    assert response.json()["detail"] == "CODEFORGE_MODEL_NAME is required"
 
 
 def test_agent_run_endpoints_reject_unknown_resources(tmp_path: Path) -> None:
@@ -99,7 +99,7 @@ def test_agent_run_endpoints_reject_unknown_resources(tmp_path: Path) -> None:
 
     assert missing_repository.status_code == 404
     assert missing_run.status_code == 404
-    assert missing_run.json() == {"detail": "Agent run does not exist"}
+    assert missing_run.json()["detail"] == "Agent run does not exist"
 
 
 def test_agent_run_uses_git_tools_and_records_results(tmp_path: Path) -> None:

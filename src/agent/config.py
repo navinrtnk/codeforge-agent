@@ -8,6 +8,7 @@ from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from agent.mcp_config import MCPServerConfig, ServerName
+from agent.usage import ModelPrice
 
 
 class Settings(BaseSettings):
@@ -96,6 +97,7 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr | None = None
     anthropic_api_key: SecretStr | None = None
     mcp_servers: dict[ServerName, MCPServerConfig] = Field(default_factory=dict, max_length=8)
+    model_prices: dict[str, ModelPrice] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_configuration(self) -> Settings:

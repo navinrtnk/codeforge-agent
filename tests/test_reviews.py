@@ -351,8 +351,10 @@ def test_invalid_structured_output_is_a_safe_model_error(
     (repository / "app.py").write_text(AFTER, encoding="utf-8")
     with client_for(tmp_path, FakeModelClient([response(data)])) as client:
         result = client.post(register(client, repository), json={})
+        usage = client.get("/usage").json()["models"]
+        assert len(usage) == 1 and usage[0]["calls"] == 1
     assert result.status_code == 502
-    assert result.json() == {"detail": "Unable to generate a valid code review"}
+    assert result.json()["detail"] == "Unable to generate a valid code review"
 
 
 @pytest.mark.parametrize("kind", ["text", "truncated", "unknown_tool", "multiple_calls"])

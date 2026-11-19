@@ -46,7 +46,7 @@ def test_register_repository_rejects_duplicate_path(tmp_path: Path) -> None:
         response = client.post("/repositories", json=payload)
 
     assert response.status_code == 409
-    assert response.json() == {"detail": "Repository path is already registered"}
+    assert response.json()["detail"] == "Repository path is already registered"
 
 
 def test_register_repository_rejects_missing_path(tmp_path: Path) -> None:
@@ -57,7 +57,7 @@ def test_register_repository_rejects_missing_path(tmp_path: Path) -> None:
         )
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "Repository path does not exist"}
+    assert response.json()["detail"] == "Repository path does not exist"
 
 
 def test_register_repository_rejects_file_path(tmp_path: Path) -> None:
@@ -71,7 +71,7 @@ def test_register_repository_rejects_file_path(tmp_path: Path) -> None:
         )
 
     assert response.status_code == 422
-    assert response.json() == {"detail": "Repository path is not a directory"}
+    assert response.json()["detail"] == "Repository path is not a directory"
 
 
 def test_register_repository_rejects_path_outside_workspace(tmp_path: Path) -> None:
@@ -87,7 +87,7 @@ def test_register_repository_rejects_path_outside_workspace(tmp_path: Path) -> N
         )
 
     assert response.status_code == 403
-    assert response.json() == {"detail": "Repository path is outside the workspace root"}
+    assert response.json()["detail"] == "Repository path is outside the workspace root"
 
 
 def test_list_repositories_supports_pagination(tmp_path: Path) -> None:

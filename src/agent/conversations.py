@@ -24,6 +24,7 @@ from agent.schemas import (
     ConversationMessageResponse,
     ConversationResponse,
 )
+from agent.usage import UsageModelClient
 
 router = APIRouter(prefix="/repositories/{repository_id}/conversations", tags=["conversations"])
 
@@ -121,7 +122,7 @@ async def append_message(
     repository = _get_repository(session, repository_id)
     settings = request.app.state.settings
     memory = ConversationMemory(
-        model_client,
+        UsageModelClient(model_client, session, settings.model_prices),
         history_token_budget=settings.conversation_history_token_budget,
         summary_max_tokens=settings.conversation_summary_max_tokens,
         summary_input_token_budget=settings.conversation_summary_input_token_budget,

@@ -14,6 +14,7 @@ from agent.repositories import RepositoryAccessDependency
 from agent.repository_access import RepositoryAccessError
 from agent.review_service import ReviewService
 from agent.schemas import ReviewCreate, ReviewResponse
+from agent.usage import UsageModelClient
 
 router = APIRouter(prefix="/repositories/{repository_id}/reviews", tags=["code reviews"])
 
@@ -34,7 +35,7 @@ async def create_review(
     settings = request.app.state.settings
     service = ReviewService(
         get_git_service(request, access),
-        model_client,
+        UsageModelClient(model_client, session, settings.model_prices),
         max_files=settings.review_max_files,
         max_context_bytes=settings.review_max_context_bytes,
         max_output_tokens=settings.agent_max_output_tokens,

@@ -162,6 +162,8 @@ def test_summaries_compact_old_turns_and_persist_without_deleting_messages(tmp_p
         metadata = client.get(url).json()
         assert metadata["summary_through_turn"] == 2
         assert metadata["summary"] == "Brief answers; explain validation next"
+        usage = client.get("/usage").json()["models"][0]
+        assert usage["calls"] == 5 and usage["input_tokens"] == 50
         assert len(client.get(url + "/messages").json()) == 6
         assert client.get(url).json()["is_running"] is False
     assert len(model.requests) == 5

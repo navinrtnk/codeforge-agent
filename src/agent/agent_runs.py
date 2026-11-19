@@ -159,6 +159,7 @@ def build_agent_runner(
         run_type=run_type,
         max_repair_attempts=settings.bug_fix_max_attempts,
         mcp_servers=settings.mcp_servers,
+        model_prices=settings.model_prices,
     )
 
 

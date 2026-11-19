@@ -35,8 +35,10 @@ from agent.models_api import (
     ToolCall,
     ToolResult,
 )
+from agent.observability import configure_logging, logger, run_id
 from agent.repository_access import RepositoryAccess
 from agent.tools import ToolContext, ToolExecutor, ToolRegistry, redact_json_object, serialize_json
+from agent.usage import ModelPrice, UsageModelClient
 
 SYSTEM_PROMPT = """You are CodeForge Agent, a repository analysis assistant.
 Use only the provided tools within the active repository.
@@ -75,6 +77,7 @@ class AgentRunner:
         run_type: AgentRunType = AgentRunType.TASK,
         max_repair_attempts: int = 3,
         mcp_servers: dict[str, MCPServerConfig] | None = None,
+        model_prices: dict[str, ModelPrice] | None = None,
     ) -> None:
         if max_iterations < 1:
             raise ValueError("Maximum agent iterations must be positive")
@@ -100,6 +103,7 @@ class AgentRunner:
         self.run_type = run_type
         self.max_repair_attempts = max_repair_attempts
         self.mcp_servers = mcp_servers or {}
+        self.model_prices = model_prices or {}
         self.git_context = GitContextBuilder(
             git_service or GitService(access),
             max_bytes=git_context_max_bytes,
@@ -138,6 +142,9 @@ class AgentRunner:
             session.add(conversation_turn)
         session.commit()
 
+        configure_logging()
+        correlation = run_id.set(str(run.id))
+        logger.info("run.started")
         try:
             async with asyncio.timeout(self.timeout_seconds):
                 snapshot = await self.git_context.build(Path(repository.path))
@@ -188,6 +195,9 @@ class AgentRunner:
         except Exception as error:
             sanitized = redact_json_object({"message": str(error)})["message"]
             self._fail_run(session, run, cast(str, sanitized))
+        finally:
+            logger.info("run.finished", extra={"status": run.status.value})
+            run_id.reset(correlation)
         return run
 
     async def _execute_loop(
@@ -207,7 +217,9 @@ class AgentRunner:
         )
 
         for _ in range(self.max_iterations):
-            response = await self.model_client.complete(
+            response = await UsageModelClient(
+                self.model_client, session, self.model_prices, run_id=run.id
+            ).complete(
                 ModelRequest(
                     messages=tuple(messages),
                     tools=self.registry.definitions(),
